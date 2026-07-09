@@ -216,13 +216,14 @@ class ManipulatorManager(QObject):
     def singular_vals_vecs_rot(self):
         return self._manipulator.singular_vals_vecs_rot
 
-    def update_status(self, status: str, mot_list: list):
+    def update_status(self, mot_list: list):
         """ Update system status and return by dictionary.
         @param status: str, controller status
         @param mot_list: List of 8 floats, motor positions as degrees
         """
         mot_vec = np.deg2rad(np.array(mot_list))
-        self._manipulator.update_state(status, mot_vec)
+        self._manipulator.update_state(mot_vec[:6])
+        # self._linear_base.update_state(mot_vec[6:])
         self._linear_base.update_state()
 
         mot_vec_deg = np.rad2deg(self._manipulator.mot_coords)
@@ -249,9 +250,13 @@ class ManipulatorManager(QObject):
         cond_base = self._manipulator._compute_condition(np.eye(3))
         cond_tool = self._manipulator._compute_condition(rot_mat_tool_wrt_base)
 
+        # TODO: Fix this bandate
+        system_mot_vec_deg = mot_list.copy()
+        system_jnt_vec_deg = np.zeros(8)
+        system_jnt_vec_deg[:6] = np.rad2deg(self._manipulator.jnt_coords)
         state = {
-            'mot_coords_deg': mot_vec_deg,
-            'jnt_coords_deg': np.rad2deg(self._manipulator.jnt_coords),
+            'mot_coords_deg': system_mot_vec_deg,
+            'jnt_coords_deg': system_jnt_vec_deg,
             'ops_coords_base': ops_vec_base,
             'ops_coords_world': ops_vec_world,
             'zyz_euler_base': zyz_tool_wrt_base,

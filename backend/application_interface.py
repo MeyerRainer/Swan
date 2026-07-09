@@ -164,7 +164,7 @@ class ApplicationInterface(QObject):
         self._toolbar.update_status(status)
 
         # Update manipulator state
-        status_dict: dict = self.manipulator.update_status(status, m_pos)
+        status_dict: dict = self.manipulator.update_status(m_pos)
 
         # Update digital readout
         self._dro.update_status(status_dict)
