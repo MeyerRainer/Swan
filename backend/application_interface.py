@@ -76,7 +76,7 @@ class ApplicationInterface(QObject):
         self._control.j6_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(5, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
         # self._control.j7_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(6, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
         # Linear axis joints
-        self._control.jl1_slider.connect_target(lambda val: self.manipulator.move_single_jnt_linear_axis(7, distance=0.001*val, speed=utils.mm_min2m_s(self._control.speed_joint.value())))
+        self._control.jl1_slider.connect_target(lambda val: self.manipulator.move_single_jnt_linear_axis(0, distance=0.001*val, speed=utils.mm_min2m_s(self._control.speed_joint.value())))
         # self._control.jl2_slider.connect_target(lambda val: self.manipulator.move_single_jnt_linear_axis(0, distance=0.001*val, speed=utils.mm_min2m_s(self._control.speed_joint.value())))
 
 

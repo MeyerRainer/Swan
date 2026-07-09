@@ -13,8 +13,12 @@ HALF_PI = math.pi / 2
 QUARTER_PI = math.pi / 4
 THREE_PI_FOUR = 3 * math.pi / 4
 
+# Linear base DOF's
+LINEAR_AXIS = ['X']
+
 N_REV_JNT = 6
-N_LIN_JNT = 1
+N_LIN_JNT = len(LINEAR_AXIS)
+
 
 # Joint max angles (deg, mm)
 JOINT_LIMITS = {
@@ -103,9 +107,6 @@ TOOL_OFS = np.array([
 # TOOL_OFS[:3, :3] = utils.zyz2rot_mat(np.array([0, -math.pi/4, 0]))
 
 INV_TOOL_OFS = np.linalg.inv(TOOL_OFS)
-
-N_AXIS = 7  # Manipulator axis
-N_AXIS_LIN  = 1  # Linear axis
 
 # GUI Defaults
 LINEAR_SPEED_MIN = 10  # mm/min

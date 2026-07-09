@@ -226,9 +226,8 @@ class ManipulatorManager(QObject):
         @param mot_list: List of 8 floats, motor positions as degrees
         """
         mot_vec = np.deg2rad(np.array(mot_list))
-        self._manipulator.update_state(mot_vec[:6])
-        # self._linear_base.update_state(mot_vec[6:])
-        self._linear_base.update_state()
+        self._manipulator.update_state(mot_vec[:6])  # 6 axis
+        self._linear_base.update_state(mot_vec[6:7])  # 1 axis
 
         mot_vec_deg = np.rad2deg(self._manipulator.mot_coords)
         ops_vec_base = self._manipulator.ops_coords
@@ -276,7 +275,32 @@ class ManipulatorManager(QObject):
         return state
 
     def move_single_jnt_linear_axis(self, jnt_idx: int, distance: float, speed: float, incremental=False) -> bool:
-        pass
+        if (jnt_idx + 1) > N_LIN_JNT:
+            print("Invalid joint index")
+            return False
+
+        # Fetch temporary absolute joint coordinates
+        jnt_vec_current = self._linear_base.temp_jnt_coords
+
+        # Construct target joint vector
+        jnt_vec_target = jnt_vec_current.copy()
+        jnt_vec_target[jnt_idx] = distance
+
+        # Compute movement time
+        move_time_s = abs((distance - jnt_vec_current[jnt_idx]) / speed)
+
+        mot_vec = self._linear_base.move_jnt(jnt_vec_target)
+        if mot_vec is None:
+            return False
+
+        # Send to g_code_writer
+        jnt_vec_target_mm = np.zeros(8)
+        jnt_vec_target_mm[6:7] = 1000 * mot_vec
+        jnt_vec_current_mm = np.zeros(8)
+        jnt_vec_current_mm[6:7] = 1000 * jnt_vec_current
+        self.write_g_code(jnt_vec_target_mm, jnt_vec_current_mm, move_time_s)
+
+        return True
 
     def move_single_jnt_manipulator(self, jnt_idx: int, angle: float, speed: float, incremental=False) -> bool:
         """ Gets a single joint motion instruction from API. Let manipulator and linear axis verify motion,
@@ -311,6 +335,7 @@ class ManipulatorManager(QObject):
         jnt_vec_current_deg = np.zeros(8)
         jnt_vec_current_deg[:6] = np.rad2deg(jnt_vec_current)
         self.write_g_code(jnt_vec_target_deg, jnt_vec_current_deg, move_time_s)
+
         return True
 
     def move_ops(self, pose: np.ndarray, time: float, incremental: bool = False,

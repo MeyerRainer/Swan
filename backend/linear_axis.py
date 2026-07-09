@@ -2,6 +2,7 @@
 2-Axis linear base
 
 """
+from config import *
 
 import numpy as np
 import typing
@@ -12,43 +13,65 @@ class LinearAxis:
     def __init__(self):
 
         # World origin to robot base at zero joints transform
-        self._offset = np.zeros(3)
+        self._world2base_offs = np.array((0.1, 0.4, 0.), dtype=np.float32)
 
-        # World origin to base zero position transformation
-        self.transform = np.eye(4)
-        self.transform[:3, 3] = self._offset
-        self.transform[:3, :3] = [[0., 1., 0.],
-                                  [-1., 0., 0.],
-                                  [0., 0., 1.]]
-
+        # Temporary state
+        self._temp_jnt_coords = np.zeros(N_LIN_JNT, dtype=np.float32)
 
         # State
-        self._jnt_coords = np.zeros(2)
+        self._jnt_coords = np.zeros(N_LIN_JNT, dtype=np.float32)
+        self._base_in_world = np.zeros(3, dtype=np.float32)
 
-        # Position offset at zero joints
+        self._update_temp_state(self._temp_jnt_coords)
 
-        pass
-
-    # Pose in base frame -> pose in world frame
+    # def move_base(self, ops_vec: np.ndarray) -> np.ndarray | None:
+    #     """ Move base to world coordinates
+    #     @param ops_vec: 3-vector (X, Y, Z). New base frame coordinates w.r.t. world frame (meters)
+    #     @return np.ndarray of joint coordinates, None if out of reach
+    #     """
+    #     jnt_vec = ops_vec - self._world2base_offs
     #
+    #     # Zero out if DOF not available
+    #     if 'X' in LINEAR_AXIS:
+    #         self._temp_jnt_coords
+    #     if 'Y' in LINEAR_AXIS:
+    #         jnt_vec[1] = 0.
+    #     if 'Z' in LINEAR_AXIS:
+    #         jnt_vec[2] = 0.
+    #
+    #     for idx in range(N_LIN_JNT):
+    #         if not MOTOR_LINEAR_LIMITS[f"M{idx+1}_MIN"] <= ops_vec[idx] <= MOTOR_LINEAR_LIMITS[f"M{idx+1}_MAX"]:
+    #             print(f"Linear motor value out of range")
+    #             return None
+    #
+    #     return ops_vec
 
-    def _f_kin(self, jnt_vec: np.ndarray) -> np.ndarray:
-        """ jnt -> ops """
-        return self._offset + np.array((jnt_vec[0], 0., 0.))  # Only x is variable
-
-
-    def _i_kin(self, ops_vec: np.ndarray) -> np.ndarray:
-        """  ops -> jnt """
-        return np.array((ops_vec[0], 0., 0.)) - self._offset # Only x is variable
-
-    def move_lin(self, ops_vec: np.ndarray) -> np.ndarray:
-        pass
-
-    def update_state(self):
-        pass
+    def _update_temp_state(self, jnt_vec: np.ndarray) -> None:
+        self._temp_jnt_coords = jnt_vec.copy()
 
 
     # ================================= Public =================================
+
     @property
-    def position(self):
-        return self._position.copy()
+    def temp_jnt_coords(self):
+        return self._temp_jnt_coords.copy()
+
+    @property
+    def jnt_coords(self):
+        return self._jnt_coords.copy()
+
+    def move_jnt(self, jnt_vec: np.ndarray) -> np.ndarray | None:
+
+        for idx in range(N_LIN_JNT):
+            if not MOTOR_LINEAR_LIMITS[f"ML{idx + 1}_MIN"] <= jnt_vec[idx] <= MOTOR_LINEAR_LIMITS[f"ML{idx + 1}_MAX"]:
+                print(f"Linear motor value out of range")
+                return None
+
+        self._update_temp_state(jnt_vec)
+
+        return jnt_vec.copy()
+
+    def update_state(self, mot_vec):
+        self._jnt_coords = mot_vec.copy()
+
+        self._update_temp_state(self._jnt_coords)
