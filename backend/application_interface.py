@@ -67,17 +67,17 @@ class ApplicationInterface(QObject):
         self._control.ry_minus.clicked.connect(lambda: self.manipulator.rotate_tool((0, -1, 0), np.deg2rad(self._control.increment_angular.value()), utils.deg_min2rad_sec(self._control.speed_angular.value()), self._control.frame_select_orientation.currentText()))
         self._control.rz_plus.clicked.connect(lambda: self.manipulator.rotate_tool((0, 0, 1), np.deg2rad(self._control.increment_angular.value()), utils.deg_min2rad_sec(self._control.speed_angular.value()), self._control.frame_select_orientation.currentText()))
         self._control.rz_minus.clicked.connect(lambda: self.manipulator.rotate_tool((0, 0, -1), np.deg2rad(self._control.increment_angular.value()), utils.deg_min2rad_sec(self._control.speed_angular.value()), self._control.frame_select_orientation.currentText()))
-        # Joint sliders
-        self._control.j1_slider.connect_target(lambda val: self.manipulator.move_jnt_single(0, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value()), incremental=False))
-        self._control.j2_slider.connect_target(lambda val: self.manipulator.move_jnt_single(1, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value()), incremental=False))
-        self._control.j3_slider.connect_target(lambda val: self.manipulator.move_jnt_single(2, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value()), incremental=False))
-        self._control.j4_slider.connect_target(lambda val: self.manipulator.move_jnt_single(3, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value()), incremental=False))
-        self._control.j5_slider.connect_target(lambda val: self.manipulator.move_jnt_single(4, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value()), incremental=False))
-        self._control.j6_slider.connect_target(lambda val: self.manipulator.move_jnt_single(5, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value()), incremental=False))
-        # self._control.j7_slider.connect_target(lambda val: self.manipulator.move_jnt_single(6, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value()), incremental=False))
-
-        self._control.jl1_slider.connect_target(lambda val: self.manipulator.move_jnt_single(7, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value()), incremental=False))
-        # self._control.jl2_slider.connect_target(lambda val: self.manipulator.move_jnt_single(0, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value()), incremental=False))
+        # Manipulator joints
+        self._control.j1_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(0, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
+        self._control.j2_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(1, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
+        self._control.j3_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(2, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
+        self._control.j4_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(3, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
+        self._control.j5_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(4, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
+        self._control.j6_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(5, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
+        # self._control.j7_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(6, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
+        # Linear axis joints
+        self._control.jl1_slider.connect_target(lambda val: self.manipulator.move_single_jnt_linear_axis(7, distance=0.001*val, speed=utils.mm_min2m_s(self._control.speed_joint.value())))
+        # self._control.jl2_slider.connect_target(lambda val: self.manipulator.move_single_jnt_linear_axis(0, distance=0.001*val, speed=utils.mm_min2m_s(self._control.speed_joint.value())))
 
 
     def connect_signals(self):

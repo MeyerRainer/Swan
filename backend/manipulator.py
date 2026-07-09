@@ -460,7 +460,7 @@ class Manipulator:
 
         # Check limits
         for idx in range(N_REV_JNT):
-            if not MOTOR_LIMITS[f"M{idx+1}_MIN"] <= mot_vec[idx] <= MOTOR_LIMITS[f"J{idx+1}_MAX"]:
+            if not MOTOR_LIMITS[f"M{idx+1}_MIN"] <= mot_vec[idx] <= MOTOR_LIMITS[f"M{idx+1}_MAX"]:
                 print(f"Revolute motor value out of range")
                 return None
 

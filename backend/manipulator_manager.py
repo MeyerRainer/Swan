@@ -168,7 +168,10 @@ class ManipulatorManager(QObject):
         mot_diff_vec = mot_vec - mot_vec_current
 
         # Compute movement speed. Unit is a GRBL speed unit. deg/min for revolute, mm/min for linear.
-        assert time > 0, "Manager: Non positive movement time"
+        if time <= 0:
+            print("Manager: Non positive movement time")
+            return False
+
         distance = LA.norm(mot_diff_vec)
         feedrate = distance / time * 60  # Desired feed rate as deg/min and mm/min
         # print(f"Segment length mot.space: {distance:.3f}\tTime: {time:.3f}\tFeedrate: {feedrate}")
@@ -190,6 +193,7 @@ class ManipulatorManager(QObject):
             u=float(mot_vec[6]),
             v=float(mot_vec[7]),
             feedrate=feedrate)
+        print(f"write_g_code: {g_code}")
 
         self.g_code_generated.emit(g_code)
 
@@ -271,37 +275,42 @@ class ManipulatorManager(QObject):
         }
         return state
 
-    def move_jnt_single(self, jnt_idx: int, angle: float, speed: float, incremental=True) -> bool:
-        """ Move a single joint
+    def move_single_jnt_linear_axis(self, jnt_idx: int, distance: float, speed: float, incremental=False) -> bool:
+        pass
+
+    def move_single_jnt_manipulator(self, jnt_idx: int, angle: float, speed: float, incremental=False) -> bool:
+        """ Gets a single joint motion instruction from API. Let manipulator and linear axis verify motion,
+        then propagate forward to g-code writer.
         @param jnt_idx: Index of joint to move (0-7)
-        @param angle: Angle of movement, radians
-        @param speed: Speed of movement, radians/second
-        @param incremental: True for incremental movement, False for absolute movement
+        @param angle: Angle to move to, radians
+        @param speed: , Speed to move at, radians/second
+        @param incremental: Only absolute motion for now
         """
+        if (jnt_idx+1) > N_REV_JNT:
+            print("Invalid joint index")
+            return False
+
         # Fetch temporary absolute joint coordinates
-        temp_jnt_coords = self._manipulator.mot2jnt(self._manipulator.temp_mot_coords, update_state=False)
+        jnt_vec_current = self._manipulator.temp_jnt_coords
 
         # Construct target joint vector
-        if incremental:
-            jnt_vec_target = np.zeros(8)
-        else:
-            jnt_vec_target = temp_jnt_coords
+        jnt_vec_target = jnt_vec_current.copy()
         jnt_vec_target[jnt_idx] = angle
 
         # Compute movement time
-        if incremental:
-            move_time_s = abs(angle) / speed
-        else:
-            move_time_s = abs((angle - temp_jnt_coords[jnt_idx]) / speed)
+        move_time_s = abs((angle - jnt_vec_current[jnt_idx]) / speed)
+        print(f"New: {np.rad2deg(angle)}\tCurrent: {np.rad2deg(jnt_vec_current[jnt_idx])}")
 
-        # Compute list of G-code for joint motion
-        success, motion_command = self._manipulator.move_jnt(jnt_vec_target, move_time_s, incremental=incremental)
-
-        if not success:
+        mot_vec = self._manipulator.move_jnt(jnt_vec_target)
+        if mot_vec is None:
             return False
 
-        # Send to serial
-        self.g_code_generated.emit(motion_command)
+        # Send to g_code_writer
+        jnt_vec_target_deg = np.zeros(8)
+        jnt_vec_target_deg[:6] = np.rad2deg(mot_vec)
+        jnt_vec_current_deg = np.zeros(8)
+        jnt_vec_current_deg[:6] = np.rad2deg(jnt_vec_current)
+        self.write_g_code(jnt_vec_target_deg, jnt_vec_current_deg, move_time_s)
         return True
 
     def move_ops(self, pose: np.ndarray, time: float, incremental: bool = False,
