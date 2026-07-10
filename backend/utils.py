@@ -2,9 +2,11 @@
 Utility functions for Swan application.
 Author: Rainer Meyer, rot.meyer494@gmail.com
 """
+from math import atan2
+
 from backend.pose import Pose
 
-from typing import List
+from typing import List, Tuple
 import numpy as np
 import numpy.linalg as LA
 import math
@@ -71,14 +73,14 @@ def rot_mat2quat(R):
     q = np.array([w, x, y, z])
     return q / np.linalg.norm(q)
 
-def rot2zyz(rot_mat, phi_prev=0, psi_prev=0, flip=False):
+def rot2zyz(rot_mat: np.ndarray, phi_prev: float = 0, psi_prev: float = 0, flip: bool = False) -> Tuple[np.ndarray, bool]:
     """ Conversion from rotation matrix to ZYZ-Euler angles
     @param rot: np.array, rotation matrix
     @param phi_prev: float, previous value for first Z-rotation.
     Needed in case of a singularity to determine phi and psi (first and last Z-angles)
+    @param psi_prev: float, previous value for last Z-rotation
     @param flip: bool. True results in positive Y-rotation, False results in negative Y-rotation. Verify this!
     """
-    singularity = False
     zyz = np.zeros(3)  # [phi, nu, psi]
     z_i = rot_mat[0][2]  # i-component of Z-unit vector
     z_j = rot_mat[1][2]  # j-component of Z-unit vector
@@ -87,28 +89,18 @@ def rot2zyz(rot_mat, phi_prev=0, psi_prev=0, flip=False):
     # Singularity if Z is vertical -> phi and psi dependent
     eps = 1e-3
     if z_hypo < eps:  # Singularity
-        singularity = True
         zyz[0] = phi_prev  # Force joint 4 to have value of last non-singular posture
 
-        #nu = math.atan2(0, rot[2][2])  # nu is one of following: {-pi, 0, pi}
-        # zyz[1] = -nu if flip else nu
-        zyz[1] = 0
+        zyz[1] = 0  # Joint 5 limits allow only for this singularity to happen
 
-        # x_i = rot[0][0]  # i-component of X-unit vector
-        # x_j = rot[1][0]  # j-component of X-unit vector
+        # Total rotation, sum of phi and psi
+        gamma = atan2(rot_mat[1][0], rot_mat[0][0])
 
-        # psi defines z-rotation
-        # if abs(nu) < eps:
-        #     psi = math.atan2(x_j, x_i)
-        # else:
-        #     psi = math.atan2(x_j, -x_i)
-        # zyz[2] = psi - phi_prev
-        # Flip negative half-rotation to positive
-        # if zyz[2] == -math.pi:
-        #     zyz[2] = math.pi
-        zyz[2] = psi_prev
-        # print(f"ZYZ: {zyz[0]:.3f}\t{zyz[1]:.3f}\t{zyz[2]:.3f}\tSingularity: {singularity}")
-        return zyz, singularity
+        # Solve phi and psi as least squares solution
+        zyz[0] = 0.5 * (gamma + phi_prev - psi_prev)  # Phi / J4
+        zyz[2] = 0.5 * (gamma - phi_prev + psi_prev)  # Psi / J6
+
+        return zyz, False
 
     # Fully defined rotation: Nu = [0, pi] or [-pi, 0] when flipped
     if flip:
@@ -120,20 +112,11 @@ def rot2zyz(rot_mat, phi_prev=0, psi_prev=0, flip=False):
         nu = math.atan2(z_hypo, rot_mat[2][2])
         psi = math.atan2(rot_mat[2][1], -rot_mat[2][0])
 
-    # TODO: Fix bandaid fix properly
-    # if psi+eps >= np.pi:
-    #     psi -= 2*np.pi
-
     zyz[0] = phi  # Around Z
     zyz[1] = nu  # Around new Y
     zyz[2] = psi  # Around new Z
 
-    # print(f"ZYZ: {zyz[0]:.3f}\t{zyz[1]:.3f}\t{zyz[2]:.3f}\tSingularity: {singularity}\tDet:{np.linalg.det(rot)}")
-    # print(f"z = {rot[:, 2]}")
-    # print(f"z_hypo = {math.hypot(rot[0, 2], rot[1, 2]):.12f}")
-    # print(f"R22 = {rot[2, 2]:.12f}")
-    # print(f"ZYZ: {zyz[0]:.3f}\t{zyz[1]:.3f}\t{zyz[2]:.3f}\tSingularity: {singularity}")
-    return zyz, singularity
+    return zyz, True
 
 def zyz2rot_mat(zyz, degrees=False):
     """ Conversion from ZYZ-Euler angles  to a rotation matrix

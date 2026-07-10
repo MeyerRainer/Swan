@@ -156,7 +156,7 @@ class ManipulatorManager(QObject):
     #
     #     return success, g_code_list
 
-    def write_g_code(self, mot_vec: np.ndarray, mot_vec_current: np.ndarray, time: float, feedrate: float = None, incremental: bool=False) -> bool:
+    def write_g_code(self, mot_vec: np.ndarray, mot_vec_current: np.ndarray, time: float, feedrate: float = None) -> bool:
         """ Generates a G-code with units of deg, mm and minutes and emits it to g_code_generated signal
         @param mot_vec: 8-vector of motor absolute coordinates in controller distance units (deg for angular, mm for linear)
         @param mot_vec_current: 8-vector of current motor positions. Needed for computing motion distance.
@@ -193,7 +193,7 @@ class ManipulatorManager(QObject):
             u=float(mot_vec[6]),
             v=float(mot_vec[7]),
             feedrate=feedrate)
-        print(f"write_g_code: {g_code}")
+        # print(f"write_g_code: {g_code}")
 
         self.g_code_generated.emit(g_code)
 
@@ -379,25 +379,31 @@ class ManipulatorManager(QObject):
 
         return True
 
-    def rotate_tool(self, direction_vec: tuple[int, int, int], angle: float, speed: float, frame: str, degrees=False) -> bool:
+    def rotate_tool(self, direction_vec: tuple[int, int, int], angle: float, speed: float, frame: str) -> bool:
         """ Creates a pure rotation around any axis in any frame.
         :param direction_vec: Rotation axis, any length
-        :param angle: Rotation angle, radians by default
+        :param angle: Rotation angle, radians
         :param speed: Rotation speed, radians/second
         :param frame: Frame respect to which direction vector is described. "World", "Base" or "Tool"
-        :param degrees: Unit of angle
         """
         # Compute list of G-code for rotational move
-        success, g_code_list = self._manipulator.rotate_tool(direction_vec, angle, speed, frame, degrees)
-        if not success:
+        mot_vecs, segment_time = self._manipulator.rotate_tool(direction_vec, angle, speed, frame)
+        if mot_vecs is None:
             return False
 
+        # TODO: Fix
+        # Pad with zerosNx6 -> Nx8
+        mot_vecs = np.rad2deg(mot_vecs)
+        mot_vecs = np.hstack((mot_vecs, np.zeros((mot_vecs.shape[0], 2))))
+
         # Send G-code to serial
-        for line in g_code_list:
-            self.g_code_generated.emit(line)
+        mot_vec_prev = np.zeros(8)
+        mot_vec_prev[:6] = self._manipulator.mot_coords
+        for vec in mot_vecs:
+            self.write_g_code(vec, mot_vec_prev, segment_time)
+            mot_vec_prev = vec
 
         return True
-
     def reset(self):
         self._manipulator.reset()
 

@@ -661,7 +661,6 @@ class Manipulator:
             mot_vecs[idx] = mot_vec
 
         # All interpolation points computed successfully
-        print(f"Move_ops_lin: {mot_vecs[-1]}")
         return mot_vecs, segment_time
 
     def translate_tool(self, direction_vec: tuple[int, int, int], distance: float, speed: float, frame: str) -> Tuple[np.ndarray, float] | None:
@@ -692,8 +691,7 @@ class Manipulator:
         # Compute G-code list for end and intermediate postures
         return self.move_ops_lin(end_pose, speed_linear=speed, incremental=False)
 
-    def rotate_tool(self, direction_vec: tuple[int, int, int], angle: float, speed: float,
-                    frame: str, degrees: bool = False) -> np.ndarray | None:
+    def rotate_tool(self, direction_vec: tuple[int, int, int], angle: float, speed: float, frame: str) -> np.ndarray | None:
         """ Creates a pure rotation around any axis in any frame.
         :param direction_vec: Rotation axis, any length
         :param angle: Rotation angle, radians by default
@@ -701,9 +699,6 @@ class Manipulator:
         :param frame: Frame respect to which direction vector is described. "World", "Base" or "Tool"
         :param degrees: Unit of angle
         """
-        if degrees:
-            angle = np.deg2rad(angle)
-
         # Normalize direction vector
         direction_vec = np.array(direction_vec)
         unit_vec = direction_vec / LA.norm(direction_vec)
