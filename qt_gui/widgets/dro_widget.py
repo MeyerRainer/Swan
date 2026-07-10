@@ -200,9 +200,9 @@ class DROWidget(QWidget):
         # Position
         frame_position = self.frame_select_position.currentText()
         if frame_position == 'World':
-            pos_vec: np.ndarray = status['ops_coords_world'][:3]
+            pos_vec: np.ndarray = status['ops_coords_world'].position
         elif frame_position == "Base":
-            pos_vec: np.ndarray = status['ops_coords_base'][:3]
+            pos_vec: np.ndarray = status['ops_coords_base'].position
         elif frame_position == "Tool":
             pos_vec = np.zeros(3)
         else:
@@ -215,10 +215,10 @@ class DROWidget(QWidget):
         # Orientation
         frame_orientation = self.frame_select_orientation.currentText()
         if frame_orientation == 'World':
-            quaternion: np.ndarray = status['ops_coords_world'][3:]
+            quaternion: np.ndarray = status['ops_coords_world'].quaternion
             zyz: np.ndarray = status['zyz_euler_world']
         elif frame_orientation == "Base":
-            quaternion: np.ndarray = status['ops_coords_base'][3:]
+            quaternion: np.ndarray = status['ops_coords_base'].quaternion
             zyz: np.ndarray = status['zyz_euler_base']
         elif frame_orientation == "Tool":
             quaternion = np.array((1., 0., 0., 0.))

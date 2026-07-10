@@ -21,7 +21,9 @@ class LinearAxis:
         # State
         self._jnt_coords = np.zeros(N_LIN_JNT, dtype=np.float32)
         self._base_in_world = np.zeros(3, dtype=np.float32)
+        self._jacobian = np.zeros((3, N_LIN_JNT), dtype=np.float32)
 
+        self._compute_jacobian()
         self._update_temp_state(self._temp_jnt_coords)
 
     # def move_base(self, ops_vec: np.ndarray) -> np.ndarray | None:
@@ -45,6 +47,17 @@ class LinearAxis:
     #             return None
     #
     #     return ops_vec
+
+    def _compute_jacobian(self):
+        """ Computes the linear base (constant) jacobian once at initialization
+        """
+        for idx, axis in enumerate(LINEAR_AXIS):
+            if axis == 'X':
+                self._jacobian[0, idx] = 1.
+            elif axis == 'Y':
+                self._jacobian[1, idx] = 1.
+            elif axis == 'Z':
+                self._jacobian[2, idx] = 1.
 
     def _update_temp_state(self, jnt_vec: np.ndarray) -> None:
         self._temp_jnt_coords = jnt_vec.copy()

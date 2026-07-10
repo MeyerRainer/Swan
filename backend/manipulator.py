@@ -5,10 +5,11 @@ Author: Rainer Meyer, rot.meyer494@gmail.com
 import config
 from config import *
 from backend import utils
+from backend.pose import Pose
 
 import math
 from math import pi, sin, cos, tan, atan, sqrt, fabs
-from typing import Tuple, Union, Literal
+from typing import Tuple, Union, List, Literal
 import numpy as np
 from numpy import linalg as LA
 from dataclasses import dataclass
@@ -56,14 +57,14 @@ class Manipulator:
         # Temporary coordinates. Needed if joint motions are generated before main state has been updated.
         self._temp_mot_coords = np.zeros(N_REV_JNT, dtype=np.float32)
         self._temp_jnt_coords = np.zeros(N_REV_JNT, dtype=np.float32)
-        self._temp_ops_coords = np.zeros(7, dtype=np.float32)
+        self._temp_ops_coords = Pose.identity()
         self._temp_base_jacobian: np.ndarray = np.zeros((6, N_REV_JNT), dtype=np.float32)  # Manipulator jacobian in world and base frame
         self._temp_tool_jacobian: np.ndarray = np.zeros((6, N_REV_JNT), dtype=np.float32)  # Manipulator jacobian in tool frame
 
         # Main manipulator state. Updated only through serial port status update from robot controller
         self._mot_coords = np.zeros(N_REV_JNT, dtype=np.float32)
         self._jnt_coords = np.zeros(N_REV_JNT, dtype=np.float32)
-        self._ops_coords = np.zeros(7, dtype=np.float32)
+        self._ops_coords = Pose.identity()
         self._base_jacobian: np.ndarray = np.zeros((6, N_REV_JNT), dtype=np.float32)  # Manipulator jacobian in world and base frame
         self._tool_jacobian: np.ndarray = np.zeros((6, N_REV_JNT), dtype=np.float32)  # Manipulator jacobian in tool frame
 
@@ -95,21 +96,10 @@ class Manipulator:
               f"J5: {self._jnt_coords[4]:.3f}\n"
               f"J6: {self._jnt_coords[5]:.3f}\n")
 
-        print(f"Position:\n"
-              f"X: {self._ops_coords[0]:.3f}\n"
-              f"Y: {self._ops_coords[1]:.3f}\n"
-              f"Z: {self._ops_coords[2]:.3f}\n")
-
-        print(f"Orientation:\n"
-              f"w: {self._ops_coords[3]:.3f}\n"
-              f"i: {self._ops_coords[4]:.3f}\n"
-              f"j: {self._ops_coords[5]:.3f}\n"
-              f"k: {self._ops_coords[6]:.3f}\n")
-
         print(f"Base jacobian:\n{np.round(self._base_jacobian, 3)}\n")
         print(f"Tool jacobian:\n{np.round(self._tool_jacobian, 3)}\n")
 
-    def _f_kin(self, jnt_coords: np.ndarray) -> np.ndarray:
+    def _f_kin(self, jnt_coords: np.ndarray) -> Pose:
         """ Forward kinematics. Computes OPS coords [X Y Z W I J K] from given joint 8-vector.
         Source: L.Sciavicco and B.Siciliano, Modelling and Control of Robot Manipulators
         @param jnt_coords: np.array, 6-vector of joint coordinates
@@ -162,9 +152,9 @@ class Manipulator:
         # Tool frame respect to base frame
         tool_pose = wrist_pose @ config.TOOL_OFS
 
-        return np.hstack((tool_pose[:3, 3], utils.rot_mat2quat(tool_pose[:3, :3])))
+        return Pose.from_SE3(tool_pose)
 
-    def _i_kin(self, pose: np.ndarray, prev_jnt_vec: np.ndarray, shoulder_flip: bool = False,
+    def _i_kin(self, target_pose: Pose, prev_jnt_vec: np.ndarray, shoulder_flip: bool = False,
                elbow_down: bool = False, wrist_flip: bool = False) -> Tuple[Union[None, np.ndarray], int]:
         """ Inverse kinematics. Computes join (1-6) values for given posture.
         Custom implementation of information found in L.Sciavicco and B.Siciliano, Modelling and Control of Robot Manipulators
@@ -185,11 +175,8 @@ class Manipulator:
         elbow2wrist = np.sqrt(a3 * a3 + d4 * d4)
         th3off = atan(a3 / d4)  # Theta 3 offset
 
-        # Find the pose of spherical wrist
-        tool_pose = np.eye(4)  # End effector pose in base frame
-        tool_pose[:3, 3] = pose[:3]  # Translation vector
-        tool_pose[:3, :3] = utils.quat2rot_mat(pose[3:])  # Rotation matrix
-        wrist_pose = tool_pose @ config.INV_TOOL_OFS
+        # Backwards rotation from target pose to find wrist pose
+        wrist_pose = target_pose.SE3 @ config.INV_TOOL_OFS
         wx, wy, wz = wrist_pose[0, 3], wrist_pose[1, 3], wrist_pose[2, 3]
 
         # Solve Joint 1 and check limit
@@ -393,9 +380,9 @@ class Manipulator:
 
         return J
 
-    def _compute_tool_jacobian(self, J: np.ndarray, ops_vec: np.ndarray):
+    def _compute_tool_jacobian(self, J: np.ndarray, ops_vec: Pose):
         """ Rotate manipulator jacobian into tool frame """
-        tool_rot = utils.quat2rot_mat(ops_vec[3:])
+        tool_rot = utils.quat2rot_mat(ops_vec.quaternion)
 
         # Block-diagonal rotation matrix
         R = np.eye(6)
@@ -539,7 +526,7 @@ class Manipulator:
         @param mot_vec: np.array, vector of motor values in radians
         """
         self._mot_coords = mot_vec.copy()
-        self.mot2jnt(self._mot_coords)
+        self._jnt_coords = self.mot2jnt(self._mot_coords)
 
         # Update internal OPS coords
         self._ops_coords = self._f_kin(self.jnt_coords)
@@ -566,11 +553,11 @@ class Manipulator:
         mot_vec[2] = jnt_vec[2] + jnt_vec[1]
         return mot_vec
 
-    def f_kin(self, jnt_coords) -> np.ndarray:
+    def f_kin(self, jnt_coords) -> Pose:
         """ Forward kinematics. See _f_kin for details. """
         return self._f_kin(jnt_coords)
 
-    def i_kin(self, pose: np.ndarray, prev_jnt_vec: np.ndarray, shoulder_flip=False,
+    def i_kin(self, pose: Pose, prev_jnt_vec: np.ndarray, shoulder_flip=False,
               elbow_down=False, wrist_flip=False) -> Tuple[Union[None, np.ndarray], int]:
         """ Inverse kinematics. See _i_kin for details. """
         return self._i_kin(pose, prev_jnt_vec, shoulder_flip, elbow_down, wrist_flip)
@@ -587,27 +574,22 @@ class Manipulator:
             jnt_pos_absolute = np.deg2rad(jnt_pos_absolute)
         return self._move_jnt(jnt_pos_absolute)
 
-    def move_ops(self, pose: np.ndarray, incremental: bool = False,
+    def move_ops(self, target: Pose, incremental: bool = False,
                  shoulder_flip: bool = False, elbow_down: bool = False, wrist_flip: bool = False) -> np.ndarray | None:
         """ Motor space interpolated motion to given posture.
-        :param pose: Target posture: [X Y Z W I J K]
+        :param target:
         :param incremental: Posture as absolute or incremental to current posture
         :param elbow_down: Bool, for i_kin to choose a specific solution
         :param shoulder_flip: Bool, for i_kin to choose a specific solution
         :param wrist_flip: Bool, for i_kin to choose a specific solution
         :return: True if motion was executed
         """
-        target_ops = pose.copy()
-        # if incremental:
-        #     target_ops[:3] += self._ops_coords[:3]
-        #     target_ops[3:] = utils.quat_multiply(target_ops[3:], self._ops_coords[3:])
 
         # Move too short
-        # TODO: Change to pose class and make and "is_close(other_pose)" method
-        if LA.norm((target_ops - self._ops_coords)) < 1e-6:
+        if self.ops_coords.is_close(target):
             return None
 
-        target_jnt_vec, ik_sol = self._i_kin(target_ops, prev_jnt_vec=self._temp_jnt_coords.copy(), shoulder_flip=shoulder_flip, elbow_down=elbow_down, wrist_flip=wrist_flip)
+        target_jnt_vec, ik_sol = self._i_kin(target, prev_jnt_vec=self._temp_jnt_coords.copy(), shoulder_flip=shoulder_flip, elbow_down=elbow_down, wrist_flip=wrist_flip)
 
         if ik_sol != IK_SOLUTION["SUCCESS"]:
             print(f"move_ops: IK fail: {ik_sol}")
@@ -616,11 +598,11 @@ class Manipulator:
         # Propagate motion request forwards
         return self._move_jnt(target_jnt_vec)
 
-    def move_ops_lin(self, pose: np.ndarray, speed_linear: float = None, speed_angular: float = None,
+    def move_ops_lin(self, target_pose: Pose, speed_linear: float = None, speed_angular: float = None,
                      segment_length_m: float = 0.001, segment_size_rad: float = 0.0035, incremental: bool = False) -> Tuple[np.ndarray, float] | None:
         """ Linear move in operational space  coordinates. Splits move into segments size of segment_length
         and computes inverse kinematics for all points. If a  move includes both  rotation and translation,
-        :param pose: 7-np-array, position vector + orientation quaternion [x, y, z, w, i, j, k]
+        :param target_pose:
         :param speed_linear: m/s, linear speed. By default, this is used.
         :param speed_angular: rad/s, rotational speed. Used if no linear speed is given.
         :param segment_length_m: m, Length of translational segment.
@@ -628,26 +610,20 @@ class Manipulator:
         :param incremental: Bool, incremental or absolute move
         :return: True if move was executed
         """
-        success = True
-        g_code_list = []
-
         # Target posture
-        target = pose.copy()
-        if incremental:
-            target[:3] += self._ops_coords[:3]
-            target[3:] = utils.quat_multiply(target[3:], self._ops_coords[3:])
+        # target = pose.copy()
+        # if incremental:
+        #     target[:3] += self._ops_coords[:3]
+        #     target[3:] = utils.quat_multiply(target[3:], self._ops_coords[3:])
+
+        current_pose: Pose = self.ops_coords
 
         # Translational error, meters
-        translation = target[:3] - self._ops_coords[:3]
-        tool_translation_dist = LA.norm(translation)
+        tool_translation_dist = current_pose.distance(target_pose)
         n_segments_lin = int(np.ceil(tool_translation_dist / segment_length_m))
 
         # Rotational error, radians
-        similarity = np.clip(np.dot(self._ops_coords[3:], target[3:]), -1, 1)
-        if similarity < 0:
-            target[3:] *= -1
-            similarity *= -1
-        tool_rotation_dist = 2*math.acos(similarity)
+        tool_rotation_dist = target_pose.angle(self._ops_coords)
         n_segments_ang = int(np.ceil(tool_rotation_dist / segment_size_rad))
 
         # Choose whether rotation or translation determines segment count
@@ -666,61 +642,58 @@ class Manipulator:
 
         segment_time = move_time / n_segments  # Seconds
 
-        # Check if all interpolated points are reachable
-        previous_jnt_vec = self._jnt_coords.copy()
-        jnt_solutions = np.zeros((n_segments, 6))
-        for idx in range(n_segments):
-            t = (idx + 1) / n_segments  # Interpolation parameter in range of [0, 1]
-            pose_interpolated = np.zeros(7)
-            pose_interpolated[:3] = self._ops_coords[:3] + t*translation  # Segment end position
-            pose_interpolated[3:] = utils.slerp(self._ops_coords[3:], target[3:], t)  # Segment end quaternion
-            new_jnt_vec, ik_sol = self.i_kin(pose_interpolated, prev_jnt_vec=previous_jnt_vec, wrist_flip=self.wrist_flip)
-            jnt_solutions[idx] = new_jnt_vec.copy()
-            previous_jnt_vec = new_jnt_vec.copy()
+        # Interpolate poses
+        poses = utils.pose_interpolator(current_pose, target_pose, segment_count=n_segments)
+        if poses is None:
+            return None
 
+        mot_vecs = np.zeros((n_segments, N_REV_JNT))
+        for idx, pose in enumerate(poses):
+            interp_jnt_vec, ik_sol = self.i_kin(pose, prev_jnt_vec=self.temp_jnt_coords)
             if ik_sol != IK_SOLUTION['SUCCESS']:
                 print(f"move_ops_lin: IK fail: {ik_sol}")
                 return None
 
-        # All interpolation points computed successfully
-        # TODO: Return joint coordinates
-        return jnt_solutions, segment_time
+            mot_vec = self._move_jnt(interp_jnt_vec)
+            if mot_vec is None:
+                return None
 
-    def translate_tool(self, direction_vec: tuple[int, int, int], distance: float, speed: float,
-                       frame: str, millimeters: bool) -> Tuple[bool, list[str]]:
+            mot_vecs[idx] = mot_vec
+
+        # All interpolation points computed successfully
+        print(f"Move_ops_lin: {mot_vecs[-1]}")
+        return mot_vecs, segment_time
+
+    def translate_tool(self, direction_vec: tuple[int, int, int], distance: float, speed: float, frame: str) -> Tuple[np.ndarray, float] | None:
         """ Creates a pure translation along any axis in any frame.
         :param direction_vec: Translation axis, any length
-        :param distance: Translation distance, meters by default
+        :param distance: Translation distance, meters
         :param speed: Translation speed, meters/second
         :param frame: Frame direction vector is described in. "World", "Base" or "Tool"
-        :param millimeters: Units for distance
         """
-        if millimeters:
-            distance /= 1000  # meters
 
         # Normalize direction vector
         direction_vec = np.array(direction_vec)
         unit_vec = direction_vec / LA.norm(direction_vec)
 
+        end_pose: Pose = self.ops_coords
+
         # Convert direction vector relative to World/Base frame
-        if frame == "Base":
+        if frame == "Base" or frame == "World":
             pass
         elif frame == "Tool":
-            rot_mat = utils.quat2rot_mat(self._ops_coords[3:])
-            unit_vec = rot_mat @ unit_vec
+            unit_vec = end_pose.rot_mat @ unit_vec
         else:
             raise ValueError("Unknown frame type")
 
         # Compute end posture
-        end_pose = self.ops_coords
-        end_pose[:3] += distance * unit_vec
+        end_pose.position += distance * unit_vec
 
         # Compute G-code list for end and intermediate postures
-        success, g_code_list = self.move_ops_lin(end_pose, speed_linear=speed, incremental=False)
-        return success, g_code_list
+        return self.move_ops_lin(end_pose, speed_linear=speed, incremental=False)
 
     def rotate_tool(self, direction_vec: tuple[int, int, int], angle: float, speed: float,
-                    frame: str, degrees: bool = False) -> Tuple[bool, list[str]]:
+                    frame: str, degrees: bool = False) -> np.ndarray | None:
         """ Creates a pure rotation around any axis in any frame.
         :param direction_vec: Rotation axis, any length
         :param angle: Rotation angle, radians by default
@@ -739,15 +712,14 @@ class Manipulator:
         quat_rot = utils.dir_vec_angle2quat(unit_vec, angle)  # New orientation w.rot.t current orientation cur_Q_new
 
         # End posture by rotating current posture
-        end_pose = self.ops_coords
-        if frame == "Base":
+        end_pose: Pose = self.ops_coords
+        if frame == "Base" or frame == "World":
             # new orientation w.rot.t. world (base)
-            end_pose[3:] = utils.quat_multiply(quat_rot, end_pose[3:])
+            end_pose.quaternion = utils.quat_multiply(quat_rot, end_pose.quaternion)
         elif frame == "Tool":
-            end_pose[3:] = utils.quat_multiply(end_pose[3:], quat_rot)
+            end_pose.quaternion = utils.quat_multiply(end_pose.quaternion, quat_rot)
         else:
             raise ValueError("Invalid frame")
 
         # Compute G-code list for end and intermediate postures
-        success, g_code_list = self.move_ops_lin(end_pose, speed_angular=speed)
-        return success, g_code_list
+        return self.move_ops_lin(end_pose, speed_angular=speed)

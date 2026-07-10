@@ -4,6 +4,7 @@ Author: Rainer Meyer, rot.meyer494@gmail.com
 """
 from backend.pose import Pose
 
+from typing import List
 import numpy as np
 import numpy.linalg as LA
 import math
@@ -276,9 +277,12 @@ def parse_grbl_status(line: str):
 
     return status, m_pos, w_pos
 
-def pose_interpolator(a: Pose, b: Pose, segment_size_m: float, segment_size_rad: float) -> list[Pose] | None:
+def pose_interpolator(a: Pose, b: Pose, segment_size_m: float = 0.001, segment_size_rad: float = 0.0035, segment_count: int = None) -> list[Pose] | None:
 
-    poses = []
+    poses: List[Pose] = []
+
+    if a.is_close(b):
+        return None
 
     start_pos = a.position
     start_quat = a.quaternion
@@ -290,22 +294,25 @@ def pose_interpolator(a: Pose, b: Pose, segment_size_m: float, segment_size_rad:
     transl_norm = LA.norm(transl)
     n_segments_lin = int(np.ceil(transl_norm / segment_size_m))
 
-    # Rotational error, radians
-    similarity = np.clip(np.dot(start_quat, end_quat), -1, 1)
-    if similarity < 0:
-        end_quat *= -1
-        similarity *= -1
-    rotation_dist = 2 * math.acos(similarity)
-    n_segments_ang = int(np.ceil(rotation_dist / segment_size_rad))
+    if segment_count is not None:
+        n_segments = segment_count
+    else:
+        # Rotational error, radians
+        similarity = np.clip(np.dot(start_quat, end_quat), -1, 1)
+        if similarity < 0:
+            end_quat *= -1
+            similarity *= -1
+        rotation_dist = 2 * math.acos(similarity)
+        n_segments_ang = int(np.ceil(rotation_dist / segment_size_rad))
 
-    # Choose whether rotation or translation determines segment count
-    n_segments = max(n_segments_lin, n_segments_ang)
-    assert n_segments >= 1, "Pose interpolator: no segments!"
+        # Choose whether rotation or translation determines segment count
+        n_segments = max(n_segments_lin, n_segments_ang)
 
     for idx in range(n_segments):
         t = (idx + 1) / n_segments  # Interpolation parameter in range ]0, 1]
-        pos_idx = start_pos + t * transl  # Interpolated position
-        quat_idx = slerp(start_quat, end_quat, t)  # Interp. orientation
-        poses.append(Pose(np.hstack((pos_idx, quat_idx))))
+        pose_interp: Pose = Pose.identity()
+        pose_interp.position = start_pos + t * transl  # Interpolated position
+        pose_interp.quaternion = slerp(start_quat, end_quat, t)  # Interp. orientation
+        poses.append(pose_interp)
 
     return poses

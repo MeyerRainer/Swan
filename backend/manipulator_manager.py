@@ -156,7 +156,7 @@ class ManipulatorManager(QObject):
     #
     #     return success, g_code_list
 
-    def write_g_code(self, mot_vec: np.ndarray, mot_vec_current: np.ndarray, time: float, incremental: bool=False) -> bool:
+    def write_g_code(self, mot_vec: np.ndarray, mot_vec_current: np.ndarray, time: float, feedrate: float = None, incremental: bool=False) -> bool:
         """ Generates a G-code with units of deg, mm and minutes and emits it to g_code_generated signal
         @param mot_vec: 8-vector of motor absolute coordinates in controller distance units (deg for angular, mm for linear)
         @param mot_vec_current: 8-vector of current motor positions. Needed for computing motion distance.
@@ -230,19 +230,19 @@ class ManipulatorManager(QObject):
         self._linear_base.update_state(mot_vec[6:7])  # 1 axis
 
         mot_vec_deg = np.rad2deg(self._manipulator.mot_coords)
-        ops_vec_base = self._manipulator.ops_coords
-        rot_mat_tool_wrt_base = utils.quat2rot_mat(ops_vec_base[3:])
+        ops_vec_base: Pose = self._manipulator.ops_coords
+        rot_mat_tool_wrt_base = utils.quat2rot_mat(ops_vec_base.quaternion)
 
         zyz_tool_wrt_base = utils.rot2zyz(rot_mat_tool_wrt_base, phi_prev=self._manipulator.jnt_coords[3], psi_prev=self._manipulator.jnt_coords[5])[0]
 
         sing_vals_trans, sing_vecs_trans = self._manipulator.singular_vals_vecs_trans
         sing_vals_rot, sing_vecs_rot = self._manipulator.singular_vals_vecs_rot
 
-        ops_vec_world = ops_vec_base.copy()
-        ops_vec_world[:3] = (self._T_base_wrt_world @ np.append(ops_vec_base[:3], 1.))[:3]  # Position w.rot.t. world
-        quat_tool_wrt_base = ops_vec_base[3:]
+        ops_vec_world: Pose = ops_vec_base.copy()
+        ops_vec_world.position = (self._T_base_wrt_world @ np.append(ops_vec_base.position, 1.))[:3]  # Position w.rot.t. world
+        quat_tool_wrt_base = ops_vec_base.quaternion
         quat_tool_wrt_world = utils.quat_multiply(self._quat_base_wrt_world, quat_tool_wrt_base)
-        ops_vec_world[3:] = quat_tool_wrt_world
+        ops_vec_world.quaternion = quat_tool_wrt_world
         # rot_mat_world = utils.quat2rot_mat(quat_tool_wrt_world)
         rot_mat_world = utils.quat2rot_mat(self._quat_base_wrt_world) @ rot_mat_tool_wrt_base
         zyz_euler_world = utils.rot2zyz(rot_mat_world, phi_prev=self._manipulator.jnt_coords[3],
@@ -352,7 +352,7 @@ class ManipulatorManager(QObject):
         """
         # q_dot = J^-1 * x_dot
 
-    def translate_tool(self, direction_vec: tuple[int, int, int], distance: float, speed: float, frame: str, millimeters=False) -> bool:
+    def translate_tool(self, direction_vec: tuple[int, int, int], distance: float, speed: float, frame: str) -> bool:
         """ Creates a pure translation along any axis in any frame.
         :param direction_vec: Translation axis, any length
         :param distance: Translation distance, meters by default
@@ -361,13 +361,21 @@ class ManipulatorManager(QObject):
         :param millimeters: Units for distance
         """
         # Compute list of G-code for translational move
-        success, g_code_list = self._manipulator.translate_tool(direction_vec, distance, speed, frame, millimeters)
-        if not success:
+        mot_vecs, segment_time = self._manipulator.translate_tool(direction_vec, distance, speed, frame)
+        if mot_vecs is None:
             return False
 
+        # TODO: Fix
+        # Pad with zerosNx6 -> Nx8
+        mot_vecs = np.rad2deg(mot_vecs)
+        mot_vecs = np.hstack((mot_vecs, np.zeros((mot_vecs.shape[0], 2))))
+
         # Send G-code to serial
-        for line in g_code_list:
-            self.g_code_generated.emit(line)
+        mot_vec_prev = np.zeros(8)
+        mot_vec_prev[:6] = self._manipulator.mot_coords
+        for vec in mot_vecs:
+            self.write_g_code(vec, mot_vec_prev, segment_time)
+            mot_vec_prev = vec
 
         return True
 

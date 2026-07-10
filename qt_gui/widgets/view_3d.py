@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import *
 #from PyQt5.QtGui import QMatrix4x4
 import numpy as np
 import typing
+from backend.pose import Pose
 
 
 class Frame:
@@ -30,28 +31,30 @@ class Frame:
         self.y.translate(x,y,z)
         self.z.translate(x,y,z)
 
-    def set_pose(self, pose):
-        x, y, z, w, qx, qy, qz = pose
+    def set_pose(self, pose: Pose):
+        # x, y, z = pose.position
+        # w, qx, qy, qz = pose.quaternion
+        #
+        # # Normalize quaternion
+        # norm = np.sqrt(w * w + qx * qx + qy * qy + qz * qz)
+        #
+        # if norm < 1e-10:
+        #     return
+        #
+        # w /= norm
+        # qx /= norm
+        # qy /= norm
+        # qz /= norm
+        #
+        # rot_mat = [[1 - 2*(qy*qy + qz*qz), 2*(qx*qy - w*qz), 2*(qx*qz + w*qy)],
+        #            [2*(qx*qy + w*qz), 1 - 2*(qx*qx + qz*qz), 2*(qy*qz - w*qx)],
+        #            [2*(qx*qz - w*qy), 2*(qy*qz + w*qx), 1 - 2*(qx*qx + qy*qy)]]
+        #
+        # transform = np.eye(4)
+        # transform[:3, :3] = rot_mat
+        # transform[:3, 3] = np.array([x, y, z])
 
-        # Normalize quaternion
-        norm = np.sqrt(w * w + qx * qx + qy * qy + qz * qz)
-
-        if norm < 1e-10:
-            return
-
-        w /= norm
-        qx /= norm
-        qy /= norm
-        qz /= norm
-
-        rot_mat = [[1 - 2*(qy*qy + qz*qz), 2*(qx*qy - w*qz), 2*(qx*qz + w*qy)],
-                   [2*(qx*qy + w*qz), 1 - 2*(qx*qx + qz*qz), 2*(qy*qz - w*qx)],
-                   [2*(qx*qz - w*qy), 2*(qy*qz + w*qx), 1 - 2*(qx*qx + qy*qy)]]
-
-        transform = np.eye(4)
-        transform[:3, :3] = rot_mat
-        transform[:3, 3] = np.array([x, y, z])
-
+        transform = pose.SE3
         #tr = Transform3D(T)
         self.x.setTransform(transform)
         self.y.setTransform(transform)
@@ -87,13 +90,13 @@ class Ellipsoid(GLMeshItem):
 
         self._update_transform()
 
-    def set_pose(self, pos: np.ndarray, vals: np.ndarray, vecs: np.ndarray) -> None:
+    def set_pose(self, pose: Pose, vals: np.ndarray, vecs: np.ndarray) -> None:
         """ Set posture and scale of ellipsoid
-        :param pos:  np.array, (3,), set centroid position.
+        :param pose:
         :param vals: np.array, (3,) scales the lengths of the semi-principal axes.
         :param vecs: np.array, (3, 3), columns are the normalized singular vectors
         """
-        self._pos = np.asarray(pos, dtype=float)
+        self._pos = np.asarray(pose.position, dtype=float)
         self._vals = np.asarray(vals, dtype=float)
         self._vecs = np.asarray(vecs, dtype=float)
         self._update_transform()
@@ -162,5 +165,5 @@ class View3D(QWidget):
 
     def update_status(self, status: dict):
         self.tool_frame.set_pose(status['ops_coords_base'])
-        self.ellipsoid_trans.set_pose(status['ops_coords_base'][:3], status['sing_vals_trans'], status['sing_vecs_trans'])
-        self.ellipsoid_rot.set_pose(status['ops_coords_base'][:3], status['sing_vals_rot'], status['sing_vecs_rot'])
+        self.ellipsoid_trans.set_pose(status['ops_coords_base'], status['sing_vals_trans'], status['sing_vecs_trans'])
+        self.ellipsoid_rot.set_pose(status['ops_coords_base'], status['sing_vals_rot'], status['sing_vecs_rot'])
