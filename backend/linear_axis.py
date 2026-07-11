@@ -3,6 +3,7 @@
 
 """
 from config import *
+from backend.pose import Pose
 
 import numpy as np
 import typing
@@ -26,6 +27,9 @@ class LinearAxis:
         self._compute_jacobian()
         self._update_temp_state(self._temp_jnt_coords)
 
+        self._world_to_base: Pose = Pose.identity()
+
+
     # def move_base(self, ops_vec: np.ndarray) -> np.ndarray | None:
     #     """ Move base to world coordinates
     #     @param ops_vec: 3-vector (X, Y, Z). New base frame coordinates w.r.t. world frame (meters)
@@ -47,6 +51,22 @@ class LinearAxis:
     #             return None
     #
     #     return ops_vec
+
+    def _f_kin(self, jnt_vec) -> Pose:
+        """ Forward kinematics. Computes base pose in world coordinates from given joints (=motors)
+
+        """
+        world_to_base_vec = self._world2base_offs.copy()
+        # TODO: Verify and can this be done better?
+        for idx, axis in enumerate(LINEAR_AXIS):
+            if axis == 'X':
+                world_to_base_vec[0] += jnt_vec[idx]
+            elif axis == 'Y':
+                world_to_base_vec[1] += jnt_vec[idx]
+            elif axis == 'Z':
+                world_to_base_vec[2] += jnt_vec[idx]
+
+        return Pose.from_position(world_to_base_vec)
 
     def _compute_jacobian(self):
         """ Computes the linear base (constant) jacobian once at initialization
@@ -73,6 +93,10 @@ class LinearAxis:
     def jnt_coords(self):
         return self._jnt_coords.copy()
 
+    @property
+    def world_to_base(self):
+        return self._world_to_base
+
     def move_jnt(self, jnt_vec: np.ndarray) -> np.ndarray | None:
 
         for idx in range(N_LIN_JNT):
@@ -88,3 +112,8 @@ class LinearAxis:
         self._jnt_coords = mot_vec.copy()
 
         self._update_temp_state(self._jnt_coords)
+
+        # Update pose
+        self._world_to_base = self._f_kin(self._jnt_coords)
+        # print(f"world_to_base Pose: {self._world_to_base}")
+        # print(f"base_to_world Pose: {self._world_to_base.inverse()}")

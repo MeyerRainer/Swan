@@ -32,6 +32,10 @@ class Pose:
         return self.__copy__()
 
     @classmethod
+    def from_position(cls, pos):
+        return cls(position=pos, rotation_matrix=np.eye(3))
+
+    @classmethod
     def from_quaternion(cls, pos, quat):
         R = utils.quat2rot_mat(quat)
         return cls(position=pos, rotation_matrix=R)
@@ -66,7 +70,7 @@ class Pose:
 
     @property
     def zyz_euler(self):
-        return utils.rot2zyz(self._rot_mat)
+        return utils.rot2zyz(self._rot_mat)[0]
 
     @property
     def SE3(self):

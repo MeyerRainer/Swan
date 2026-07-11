@@ -225,45 +225,36 @@ class ManipulatorManager(QObject):
         @param status: str, controller status
         @param mot_list: List of 8 floats, motor positions as degrees
         """
+        # Real motor values reported by controller
         mot_vec = np.deg2rad(np.array(mot_list))
+
+        # Update states
         self._manipulator.update_state(mot_vec[:6])  # 6 axis
         self._linear_base.update_state(mot_vec[6:7])  # 1 axis
 
-        mot_vec_deg = np.rad2deg(self._manipulator.mot_coords)
         ops_vec_base: Pose = self._manipulator.ops_coords
-        rot_mat_tool_wrt_base = utils.quat2rot_mat(ops_vec_base.quaternion)
-
-        zyz_tool_wrt_base = utils.rot2zyz(rot_mat_tool_wrt_base, phi_prev=self._manipulator.jnt_coords[3], psi_prev=self._manipulator.jnt_coords[5])[0]
+        pose_base_to_world = self._linear_base.world_to_base.inverse()
+        # TODO: Understand why
+        ops_vec_world: Pose = ops_vec_base.relative_to(pose_base_to_world)
 
         sing_vals_trans, sing_vecs_trans = self._manipulator.singular_vals_vecs_trans
         sing_vals_rot, sing_vecs_rot = self._manipulator.singular_vals_vecs_rot
 
-        ops_vec_world: Pose = ops_vec_base.copy()
-        ops_vec_world.position = (self._T_base_wrt_world @ np.append(ops_vec_base.position, 1.))[:3]  # Position w.rot.t. world
-        quat_tool_wrt_base = ops_vec_base.quaternion
-        quat_tool_wrt_world = utils.quat_multiply(self._quat_base_wrt_world, quat_tool_wrt_base)
-        ops_vec_world.quaternion = quat_tool_wrt_world
-        # rot_mat_world = utils.quat2rot_mat(quat_tool_wrt_world)
-        rot_mat_world = utils.quat2rot_mat(self._quat_base_wrt_world) @ rot_mat_tool_wrt_base
-        zyz_euler_world = utils.rot2zyz(rot_mat_world, phi_prev=self._manipulator.jnt_coords[3],
-                                        psi_prev=self._manipulator.jnt_coords[5])[0]
-
         # Condition
-        cond_world = self._manipulator._compute_condition(rot_mat_world)
+        # TODO: Fix base and world
+        cond_world = self._manipulator._compute_condition(np.eye(3))
         cond_base = self._manipulator._compute_condition(np.eye(3))
-        cond_tool = self._manipulator._compute_condition(rot_mat_tool_wrt_base)
+        cond_tool = self._manipulator._compute_condition(ops_vec_base.rot_mat)
 
-        # TODO: Fix this bandate
-        system_mot_vec_deg = mot_list.copy()
-        system_jnt_vec_deg = np.zeros(8)
-        system_jnt_vec_deg[:6] = np.rad2deg(self._manipulator.jnt_coords)
+        jnt_vec_deg = np.zeros(8)
+        jnt_vec_deg[:6] = np.rad2deg(self._manipulator.jnt_coords)
+        jnt_vec_deg[6:7] = 1000 * self._linear_base.jnt_coords
+
         state = {
-            'mot_coords_deg': system_mot_vec_deg,
-            'jnt_coords_deg': system_jnt_vec_deg,
+            'mot_coords_deg': np.array(mot_list),
+            'jnt_coords_deg': jnt_vec_deg,
             'ops_coords_base': ops_vec_base,
             'ops_coords_world': ops_vec_world,
-            'zyz_euler_base': zyz_tool_wrt_base,
-            'zyz_euler_world': zyz_euler_world,
             'condition_world': cond_world,
             'condition_base': cond_base,
             'condition_tool': cond_tool,
