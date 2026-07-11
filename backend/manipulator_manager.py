@@ -32,21 +32,13 @@ class ManipulatorManager(QObject):
         self._manipulator = Manipulator()
         self._linear_base = LinearAxis()
 
-        # TODO: Add linear platform class. For now world-to-frame is a constant offset
-        # self._T_base_wrt_world = np.eye(4)
-        self._T_base_wrt_world = np.array([[0., 1., 0., 0.],
-                                           [-1., 0., 0., 0.],
-                                           [0., 0., 1., 0.],
-                                           [0., 0., 0., 1.]])
-
         self.gc_writer = GCodeWriter()
 
-        self._T_base_wrt_world[:3, 3] = np.array((0.1, 0.1, 0.))  # Base w.rot.t. World transformation
-        self._T_world_wrt_base = np.linalg.inv(self._T_base_wrt_world)  # World w.rot.t. Base transformation
-        # Rotation
-        self._quat_base_wrt_world = utils.rot_mat2quat(self._T_base_wrt_world[:3, :3])  # Base w.rot.t. World rotation
-        self._quat_world_wrt_base =  self._quat_base_wrt_world
-        self._quat_world_wrt_base[1:] *= -1  # World w.rot.t. Base rotation
+        self._sys_mot_vec = np.zeros(8, dtype=np.float32)
+        self._sys_jnt_vec = np.zeros(8, dtype=np.float32)
+        self._sys_ops_vec = Pose.identity()  # Tool in world
+
+        self._sys_jacobian = np.zeros((6, N_REV_JNT+N_LIN_JNT), dtype=np.float32)  # Jacobian in world / base frame
 
 
         my_target_1 = Target("T1", pose=np.array([0.280, 0., 0.325, 0., 0.707, 0., 0.707], dtype=float))  # Type: target
@@ -219,6 +211,10 @@ class ManipulatorManager(QObject):
     @property
     def singular_vals_vecs_rot(self):
         return self._manipulator.singular_vals_vecs_rot
+
+    def get_sys_status(self):
+        """ Fetch manipulator and linear base status and combine to system status. """
+        pass
 
     def update_status(self, mot_list: list):
         """ Update system status and return by dictionary.

@@ -2,8 +2,7 @@
 Class for viewport and its core components
 Author: Rainer Meyer, rot.meyer494@gmail.com
 """
-
-
+from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 #from PyQt5.QtWidgets.QWidget import width
 from pyqtgraph.opengl import *
 from pyqtgraph import Transform3D
@@ -12,6 +11,9 @@ from PyQt6.QtWidgets import *
 import numpy as np
 import typing
 from backend.pose import Pose
+
+class ViewportWidget(QOpenGLWidget):
+    ...
 
 
 class Frame:
