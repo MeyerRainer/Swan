@@ -7,9 +7,16 @@ from backend.vision_manager import VisionManager
 from backend.gc_serial import GCSerial
 from backend import utils
 
+from robot_program import parser
+from robot_program.program import Program
+from robot_program.instructions.instruction import Instruction
+from robot_program.executor import InstructionExecutor
+
 from PyQt6.QtCore import QObject
 import numpy as np
 import serial
+
+from robot_program.program import Program
 
 
 class ApplicationInterface(QObject):
@@ -22,6 +29,10 @@ class ApplicationInterface(QObject):
         self.manipulator = ManipulatorManager()
         self._camera = CameraManager()
         self._vision = VisionManager()
+
+        self._parser = parser.ProgramParser()
+        self.program = None
+        self.executor = InstructionExecutor(parent=self.manipulator)
 
         self._gui = main_window
 
@@ -41,12 +52,22 @@ class ApplicationInterface(QObject):
         self.connect_gui()
         self.connect_signals()
 
+    def get_program(self) -> Program:
+        return self.program
+
+    def execute_program(self):
+        if self.program is None:
+            self._terminal.write("No program loaded.")
+            return
+
+        self.executor.execute(self.program)
+
     def connect_gui(self):
         # GUI -> Backend
         # Toolbar
         self._toolbar.refresh_button.clicked.connect(self.refresh_ports)
         self._toolbar.connect_button.clicked.connect(self.toggle_connection)
-        self._program_control.run_button.clicked.connect(self.manipulator.execute)
+        self._program_control.run_button.clicked.connect(self.execute_program)
 
         # ======================================== Control panel =========================================
         # Translation
@@ -84,6 +105,7 @@ class ApplicationInterface(QObject):
         # --- Backend -> GUI ---
         # Manipulator
         self.manipulator.g_code_generated.connect(self.serial.send)
+        self.manipulator.send_terminal.connect(self._terminal.write)
 
         # Serial
         self.serial.connected.connect(self._toolbar.on_connect)
@@ -104,6 +126,15 @@ class ApplicationInterface(QObject):
         self._camera.frame_received.connect(self._view_camera.show_frame)
         self._camera.error.connect(self._terminal.write)
         # self._vision.processed_frame.connect(self._view_camera.show_frame)
+
+        # Program panel
+        self._program_control.directory_changed.connect(self._gui.save_last_directory)
+        self._program_control.file_loaded.connect(self.load_program)
+        self._program_control.run_button.clicked.connect(self.execute_program)
+
+    def load_program(self, file: str, extension: str):
+        self.program = self._parser.parse(file, extension)
+        self._terminal.write(f"Program loaded: {self.program.name}")
 
     def refresh_ports(self):
         self._toolbar.port_combo.clear()

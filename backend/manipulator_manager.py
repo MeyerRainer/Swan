@@ -5,15 +5,14 @@ Author: Rainer Meyer, rot.meyer494@gmail.com
 
 from backend.manipulator import Manipulator
 from backend.linear_axis import LinearAxis
-from backend.manipulator import IK_SOLUTION
+
 from backend.g_code_writer import GCodeWriter
 from backend.pose import Pose
 from config import *
 from backend import utils
-from program.instructions.instruction import Instruction
-from program.program import Program
-from program.instructions.motion import MoveJ
-from program.target import Target
+
+from robot_program.instructions.motion import MoveJ
+from robot_program.target import Target
 
 from typing import Tuple
 import numpy as np
@@ -24,6 +23,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 class ManipulatorManager(QObject):
 
     g_code_generated = pyqtSignal(str)
+    send_terminal = pyqtSignal(str)
 
     def __init__(self):
 
@@ -39,12 +39,6 @@ class ManipulatorManager(QObject):
         self._sys_ops_vec = Pose.identity()  # Tool in world
 
         self._sys_jacobian = np.zeros((6, N_REV_JNT+N_LIN_JNT), dtype=np.float32)  # Jacobian in world / base frame
-
-
-        my_target_1 = Target("T1", pose=np.array([0.280, 0., 0.325, 0., 0.707, 0., 0.707], dtype=float))  # Type: target
-        my_move_1 = MoveJ(target=my_target_1)
-        self.my_program = Program()
-        self.my_program.append(my_move_1)
 
     # def i_kin_7d(self, pose: np.ndarray, quat_err: np.ndarray, criteria) -> Tuple[np.ndarray | None, IK_SOLUTION]:
     #     """ Numerical inverse kinematics to solve 7 joints for given pose and an additional criteria
@@ -303,6 +297,8 @@ class ManipulatorManager(QObject):
 
         # Fetch temporary absolute joint coordinates
         jnt_vec_current = self._manipulator.temp_jnt_coords
+        # TODO: Fix this mess
+        mot_vec_current = self._manipulator.temp_mot_coords
 
         # Construct target joint vector
         jnt_vec_target = jnt_vec_current.copy()
@@ -317,20 +313,31 @@ class ManipulatorManager(QObject):
             return False
 
         # Send to g_code_writer
-        jnt_vec_target_deg = np.zeros(8)
-        jnt_vec_target_deg[:6] = np.rad2deg(mot_vec)
-        jnt_vec_current_deg = np.zeros(8)
-        jnt_vec_current_deg[:6] = np.rad2deg(jnt_vec_current)
-        self.write_g_code(jnt_vec_target_deg, jnt_vec_current_deg, move_time_s)
+        # jnt_vec_target_deg = np.zeros(8)
+        # jnt_vec_target_deg[:6] = np.rad2deg(mot_vec)
+        # jnt_vec_current_deg = np.zeros(8)
+        # jnt_vec_current_deg[:6] = np.rad2deg(jnt_vec_current)
+        # self.write_g_code(jnt_vec_target_deg, jnt_vec_current_deg, move_time_s)
+        mot_vec_target_deg = np.zeros(8)
+        mot_vec_target_deg[:6] = np.rad2deg(mot_vec)
+        mot_vec_current_deg = np.zeros(8)
+        mot_vec_current_deg[:6] = np.rad2deg(mot_vec_current)
+        self.write_g_code(mot_vec_target_deg, mot_vec_current_deg, move_time_s)
 
         return True
 
-    def move_ops(self, pose: np.ndarray, time: float, incremental: bool = False,
-                 shoulder_flip: bool = False, elbow_down: bool = False, wrist_flip: bool = False) -> bool:
-        success, g_code = self._manipulator.move_ops(pose, time, incremental, shoulder_flip, elbow_down, wrist_flip)
-        if not success:
+    def move_jnt(self, jnt_vec: np.ndarray, time: float, degrees: bool = False, incremental: bool = False) -> bool:
+        """ Move 8-joint """
+        mot_vec_manipulator_rad = np.deg2rad(jnt_vec[:6])
+
+        mot_vec = self._manipulator.move_jnt(mot_vec_manipulator_rad, degrees, incremental)
+        if mot_vec is None:
             return False
-        self.g_code_generated.emit(g_code)
+
+        mot_vec_deg = np.zeros(8)
+        mot_vec_deg[:6] = np.rad2deg(mot_vec)
+        # Send to serial
+        self.write_g_code(mot_vec_deg, self._sys_mot_vec, time)
         return True
 
     def move_ops_lin_7d(self, ops_vec: np.ndarray, time: float, criteria: int, incremental: bool = False) -> bool:
@@ -393,10 +400,3 @@ class ManipulatorManager(QObject):
         return True
     def reset(self):
         self._manipulator.reset()
-
-    def execute(self):
-        if self.my_program is not None:
-            instructions = self.my_program.instructions  # list
-            move_joint: Instruction = instructions[0]
-            target_pose = move_joint.target.pose
-            self.move_ops(target_pose, 10)

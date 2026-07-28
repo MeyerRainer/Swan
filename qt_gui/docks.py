@@ -34,5 +34,5 @@ class TeachDock(Dock):
 
 
 class ProgramDock(Dock):
-    def __init__(self):
-        super().__init__("program", ProgramWidget())
+    def __init__(self, initial_dir=None):
+        super().__init__("program", ProgramWidget(initial_dir=initial_dir))

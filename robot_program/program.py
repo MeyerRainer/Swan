@@ -1,6 +1,7 @@
-from typing import List
+from typing import List, Dict
 
-from program.instructions.instruction import Instruction
+from robot_program.instructions.instruction import Instruction
+from robot_program.target import Target
 
 
 class Program:
@@ -9,6 +10,7 @@ class Program:
 
         self.name = name
         self.instructions: List[Instruction] = []
+        self.targets: Dict[str, Target] = {}
         self.variables = {}
 
     def append(self, instruction: Instruction):

@@ -89,9 +89,12 @@ def rot2zyz(rot_mat: np.ndarray, phi_prev: float = 0, psi_prev: float = 0, flip:
     # Singularity if Z is vertical -> phi and psi dependent
     eps = 1e-3
     if z_hypo < eps:  # Singularity
-        zyz[0] = phi_prev  # Force joint 4 to have value of last non-singular posture
 
-        zyz[1] = 0  # Joint 5 limits allow only for this singularity to happen
+        if flip:
+            nu = math.atan2(-z_hypo, rot_mat[2][2])
+        else:
+            nu = math.atan2(z_hypo, rot_mat[2][2])
+        zyz[1] = nu
 
         # Total rotation, sum of phi and psi
         gamma = atan2(rot_mat[1][0], rot_mat[0][0])

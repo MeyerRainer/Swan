@@ -2,6 +2,8 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QSlider
 from PyQt6.QtCore import Qt
 
 STYLE = """
+    /* ================= ACTIVE STATE ================= */
+
     /* The horizontal track background */
     QSlider::groove:horizontal {
         border: none;
@@ -20,9 +22,21 @@ STYLE = """
         margin: -4px 0px;       /* Centers the 12px ball over the 4px track line */
     }
 
-    /* Optional: Change the ball color when hovering for a premium feel */
+    /* Change the ball color when hovering */
     QSlider::handle:horizontal:hover {
         background: #005A9E;    /* Darker blue on hover */
+    }
+
+    /* ================= DISABLED STATE ================= */
+
+    /* Subdued track when disabled */
+    QSlider::groove:horizontal:disabled {
+        background: #F0F0F0;    /* Very light, washed-out grey */
+    }
+
+    /* Muted handle when disabled */
+    QSlider::handle:horizontal:disabled {
+        background: #CCCCCC;    /* Muted, neutral grey handle */
     }
 """
 

@@ -1,7 +1,9 @@
+""" Motion instructions """
+
 from dataclasses import dataclass
 
-from program.instructions.instruction import Instruction
-from ..target import Target
+from robot_program.instructions.instruction import Instruction
+from robot_program.target import Target
 
 
 @dataclass

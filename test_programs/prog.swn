@@ -1,0 +1,10 @@
+# Targets
+Home = JointTarget(0, 0, 0, 0, 0, 0, 0, 0)
+target_1 = JointTarget(10, 10, 10, 0, 0, 0, 0, 0)
+
+# Main program
+MoveJ(Home)
+MoveJ(target_1)
+
+if DI("part_present"):
+    MoveJ(Home)

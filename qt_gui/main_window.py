@@ -5,11 +5,11 @@ Author: Rainer Meyer, rot.meyer494@gmail.com
 from backend import application_interface
 from qt_gui.toolbar import MainToolbar
 from qt_gui.docks import *
-from qt_gui.widgets.view_3d import View3D
-from qt_gui.widgets.camera_widget import CameraWidget
+from qt_gui.viewport.view_3d import View3D
+from qt_gui.viewport.camera_widget import CameraWidget
 
 from PyQt6.QtWidgets import QMainWindow, QApplication
-from PyQt6.QtCore import Qt, QSettings
+from PyQt6.QtCore import Qt, QSettings, QDir, pyqtSlot
 from PyQt6.QtWidgets import QTabWidget
 
 
@@ -28,7 +28,7 @@ class MainWindow(QMainWindow):
         self.dro = DRODock()
         self.terminal = TerminalDock()
         self.teach_interface = TeachDock()
-        self.program_control = ProgramDock()
+        self.program_control = ProgramDock(initial_dir=self.settings.value("last_directory", QDir.homePath()))
 
         # Viewport
         self.view_3d = View3D()
@@ -128,6 +128,10 @@ class MainWindow(QMainWindow):
 
         # Reset window size and position hardcoded defaults
         self.resize(1400, 900)
+
+    @pyqtSlot(str)
+    def save_last_directory(self, new_dir: str):
+        self.settings.setValue("last_directory", new_dir)
 
     def closeEvent(self, event):
         """ Automatically saves layout right before application exit."""
