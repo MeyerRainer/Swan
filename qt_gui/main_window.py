@@ -1,6 +1,7 @@
 """ MainWindow for Swan app. High level assembly of GUI.
 Author: Rainer Meyer, rot.meyer494@gmail.com
 """
+from PyQt6.QtGui import QIcon
 
 from backend import application_interface
 from qt_gui.toolbar import MainToolbar
@@ -19,6 +20,8 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.settings = QSettings("Meyer", "Swan")
+
+
 
         # Toolbar
         self.toolbar = MainToolbar()
@@ -82,6 +85,7 @@ class MainWindow(QMainWindow):
 
     def build_ui(self):
         self.setWindowTitle("Swan")
+        self.setWindowIcon(QIcon("resources/icons/icon256_nobg.png"))
         self.create_menu()
         self.addToolBar(self.toolbar)
 
