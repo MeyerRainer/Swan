@@ -4,7 +4,7 @@ Author: Rainer Meyer, rot.meyer494@gmail.com
 """
 from math import atan2
 
-from backend.pose import Pose
+from robot_math.pose import Pose
 
 from typing import List, Tuple
 import numpy as np
@@ -20,6 +20,9 @@ def mm_min2m_s(mm_min):
 
 def deg_min2rad_sec(deg_min):
     return deg_min * np.pi / 10800
+
+def rad_sec2deg_min(rad_sec):
+    return rad_sec * 10800 / np.pi
 
 def quat2rot_mat(q):
     """ Conversion from quaternion to rotation matrix

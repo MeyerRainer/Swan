@@ -5,15 +5,12 @@ Author: Rainer Meyer, rot.meyer494@gmail.com
 
 from backend.manipulator import Manipulator
 from backend.linear_axis import LinearAxis
-
+from backend.manipulator import IK_SOLUTION
 from backend.g_code_writer import GCodeWriter
-from backend.pose import Pose
+from robot_math.pose import Pose
 from config import *
 from backend import utils
-
-from robot_program.instructions.motion import MoveJ
-from robot_program.target import Target
-
+# from backend.system_state import SystemState
 from typing import Tuple
 import numpy as np
 import numpy.linalg as LA
@@ -30,22 +27,19 @@ class ManipulatorManager(QObject):
         super().__init__()
 
         self._manipulator = Manipulator()
-        self._linear_base = LinearAxis()
+        self._linear_axis = LinearAxis()
 
         self.gc_writer = GCodeWriter()
 
-        self._sys_mot_vec = np.zeros(8, dtype=np.float32)
-        self._sys_jnt_vec = np.zeros(8, dtype=np.float32)
-        self._sys_ops_vec = Pose.identity()  # Tool in world
+        # self.sys_state: SystemState = SystemState(self._manipulator.state, self._linear_axis.state)
 
-        self._sys_jacobian = np.zeros((6, N_REV_JNT+N_LIN_JNT), dtype=np.float32)  # Jacobian in world / base frame
-
-    # def i_kin_7d(self, pose: np.ndarray, quat_err: np.ndarray, criteria) -> Tuple[np.ndarray | None, IK_SOLUTION]:
+    # def i_kin_7d(self, end_pose: Pose, quat_err: np.ndarray, criteria) -> Tuple[np.ndarray | None, IK_SOLUTION]:
     #     """ Numerical inverse kinematics to solve 7 joints for given pose and an additional criteria
-    #     @param pose: Position vector and orientation quaternion in world frame
+    #     @param pose: Desired end posture
     #     @param criteria: Additional criteria for specific joint solution
     #     """
-    #     # TODO: Quat erro in caller function
+    #     current_pose: Pose = self._sys_pose.copy()
+    #     # TODO: Quat error in caller function
     #     # quat_err = utils.quat_multiply(quat_desired, quat_current.inv)
     #     # Quaternion error to rotation vector (for small errors only)
     #     rot_vec = 2 * quat_err[1:]  # Small angle approximation
@@ -54,119 +48,27 @@ class ManipulatorManager(QObject):
     #     converge = False
     #     iters = 0
     #     while not converge and iters > 200:
+    #         # Error
+    #         pos_err: np.ndarray = end_pose.position - current_pose.position
+    #         rot_err: np.ndarray = end
     #         # Fetch jacobian and do pseudo inverse
-    #         jacobian = np.hstack((self._manipulator.base_jacobian, self._linear_base.jacobian))  # 6x7
-    #         jacobian_pinv = LA.pinv(jacobian)
-    #         delta_q = jacobian_pinv @ delta_x
-    #
-    #
-    #
-    #
-    # def move_ops_lin_7d(self, pose: np.ndarray, speed_linear: float = None, speed_angular: float = None,
-    #                  segment_length_m: float = 0.001, segment_size_rad: float = 0.0035, incremental: bool = False) -> bool:
-    #     """ Linear move in operational space  coordinates. Splits move into segments size of segment_length
-    #     and computes inverse kinematics for all points. If a  move includes both  rotation and translation,
-    #     :param pose: 7-np-array, position vector + orientation quaternion [x, y, z, w, i, j, k], world frame
-    #     :param speed_linear: m/s, linear speed. By default, this is used.
-    #     :param speed_angular: rad/s, rotational speed. Used if no linear speed is given.
-    #     :param segment_length_m: m, Length of translational segment.
-    #     :param segment_size_rad: rad, Size of rotational segment.
-    #     :param incremental: Bool, incremental or absolute move
-    #     :return: True if move was executed
-    #     """
-    #     success = True
-    #     g_code_list = []
-    #
-    #     # Target posture
-    #     target = pose.copy()
-    #     if incremental:
-    #         target[:3] += self._ops_coords[:3]
-    #         target[3:] = utils.quat_multiply(target[3:], self._ops_coords[3:])
-    #
-    #     # Translational error, meters
-    #     translation = target[:3] - self._ops_coords[:3]
-    #     tool_translation_dist = LA.norm(translation)
-    #     n_segments_lin = int(np.ceil(tool_translation_dist / segment_length_m))
-    #
-    #     # Rotational error, radians
-    #     similarity = np.clip(np.dot(self._ops_coords[3:], target[3:]), -1, 1)
-    #     if similarity < 0:
-    #         target[3:] *= -1
-    #         similarity *= -1
-    #     tool_rotation_dist = 2*math.acos(similarity)
-    #     n_segments_ang = int(np.ceil(tool_rotation_dist / segment_size_rad))
-    #
-    #     # Choose whether  rotation or translation determines segment count
-    #     n_segments = max(n_segments_lin, n_segments_ang)
-    #     if n_segments < 1:
-    #         raise ValueError("Move results in zero segments")
-    #
-    #     # Compute movement time
-    #     move_time = 0.
-    #     if speed_linear is not None:
-    #         move_time = max(tool_translation_dist / speed_linear, move_time)  # m / (m/s) = s
-    #     if speed_angular is not None:
-    #         move_time = max(tool_rotation_dist / speed_angular, move_time)  # rad / (rad/s) = s
-    #     if move_time == 0:
-    #         raise ValueError("No speed given")
-    #
-    #     segment_time = move_time / n_segments  # Seconds
-    #
-    #     # Check if all interpolated points are reachable
-    #     previous_jnt_vec = self._jnt_coords.copy()
-    #     jnt_solutions = np.zeros((n_segments, 8))
-    #     for idx in range(n_segments):
-    #         t = (idx + 1) / n_segments  # Interpolation parameter in range of [0, 1]
-    #         pose_interpolated = np.zeros(7)
-    #         pose_interpolated[:3] = self._ops_coords[:3] + t*translation  # Segment end position
-    #         pose_interpolated[3:] = utils.slerp(self._ops_coords[3:], target[3:], t)  # Segment end quaternion
-    #         new_jnt_vec, ik_sol = self.i_kin(pose_interpolated, prev_jnt_vec=previous_jnt_vec, wrist_flip=self.wrist_flip)
-    #         jnt_solutions[idx] = new_jnt_vec.copy()
-    #         previous_jnt_vec = new_jnt_vec.copy()
-    #
-    #         if ik_sol != IK_SOLUTION['SUCCESS']:
-    #             print(f"move_ops_lin: IK fail: {ik_sol}")
-    #             return False, g_code_list
-    #
-    #
-    #     # All interpolation points computed successfully
-    #     # Write to file if file is open
-    #     if self.gc_writer.file_is_open():
-    #         self.gc_writer.write_comment("Linear move in operational space")
-    #
-    #     # Generate G-code
-    #     for jnt_pos in jnt_solutions:
-    #         segment_success, g_code = self._move_jnt(jnt_pos, segment_time, incremental=False)
-    #         success = success and segment_success
-    #         g_code_list.append(g_code)
-    #
-    #     return success, g_code_list
+    #         J = self._sys_jacobian.copy()
+    #         J_pinv = LA.pinv(J)
+    #         delta_q = J_pinv @ delta_x
 
-    def write_g_code(self, mot_vec: np.ndarray, mot_vec_current: np.ndarray, time: float, feedrate: float = None) -> bool:
+    def get_queue_motor(self):
+        """ Get motor coordinates currently queued for motion. Degrees and millimeters. """
+        sys_queue_motor = np.zeros(8)
+        sys_queue_motor[:6] = np.rad2deg(self._manipulator.state.queued.motor_state)
+        sys_queue_motor[6:7] = 1000. * self._linear_axis.state.queued.joint_state
+        return sys_queue_motor
+
+    def write_g_code(self, mot_vec: np.ndarray, feedrate: float) -> bool:
         """ Generates a G-code with units of deg, mm and minutes and emits it to g_code_generated signal
-        @param mot_vec: 8-vector of motor absolute coordinates in controller distance units (deg for angular, mm for linear)
-        @param mot_vec_current: 8-vector of current motor positions. Needed for computing motion distance.
-        @param time: Motion duration in seconds
-        @param incremental: Bool, True for incremental motor coordinates, False for absolute.
-        @return: True if generation of motion successful
+        @:param mot_vec: 8-vector of motor absolute coordinates in controller distance units (deg for angular, mm for linear)
+        @:param feedrate: Feedrate. deg/min and mm/min
+        @:return: True if generation of motion successful
         """
-        # Movement difference vector
-        mot_diff_vec = mot_vec - mot_vec_current
-
-        # Compute movement speed. Unit is a GRBL speed unit. deg/min for revolute, mm/min for linear.
-        if time <= 0:
-            print("Manager: Non positive movement time")
-            return False
-
-        distance = LA.norm(mot_diff_vec)
-        feedrate = distance / time * 60  # Desired feed rate as deg/min and mm/min
-        # print(f"Segment length mot.space: {distance:.3f}\tTime: {time:.3f}\tFeedrate: {feedrate}")
-
-        # Scale down speeds such that no motor exceeds its maximum speed
-        mot_unit_vec = np.abs(mot_diff_vec / distance)
-        for idx in range(8):
-            if mot_unit_vec[idx] > 1e6:  # Avoid near zero denominator
-                feedrate = min(MOTOR_MAX_SPEED[f"M{idx+1}"] / mot_unit_vec[idx], feedrate)
 
         # Write G-code for motor motion
         g_code = self.gc_writer.move_linear(
@@ -179,165 +81,83 @@ class ManipulatorManager(QObject):
             u=float(mot_vec[6]),
             v=float(mot_vec[7]),
             feedrate=feedrate)
-        # print(f"write_g_code: {g_code}")
 
         self.g_code_generated.emit(g_code)
+        print(f"write_g_code: {g_code}")
 
         return True
 
-    # Getters
-    @property
-    def mot_coords(self):
-        return self._manipulator.mot_coords
-
-    @property
-    def jnt_coords(self):
-        return self._manipulator.jnt_coords
-
-    @property
-    def ops_coords(self):
-        return self._manipulator.ops_coords
-
-    @property
-    def singular_vals_vecs_trans(self):
-        return self._manipulator.singular_vals_vecs_trans
-
-    @property
-    def singular_vals_vecs_rot(self):
-        return self._manipulator.singular_vals_vecs_rot
-
-    def get_sys_status(self):
-        """ Fetch manipulator and linear base status and combine to system status. """
-        pass
-
-    def update_status(self, mot_list: list):
-        """ Update system status and return by dictionary.
-        @param status: str, controller status
-        @param mot_list: List of 8 floats, motor positions as degrees
+    def sys_motor_move(self, mot_vec_manipulator: np.ndarray | None = None, mot_vec_linear_axis: np.ndarray | None = None,
+                       time: float | None = None, speed: float | None = None, incremental=False) -> bool:
+        """ Constructs an 8-vector of absolute motor coordinates to move to and a unit vector pointing
+        towards the motion direction in motor space.
+        @:param mot_vec_manipulator: Desired absolute coordinates for manipulator in radians
+        @:param mot_vec_linear_base: Desired absolute coordinates for linear base in meters
+        @:param time: Motion time in seconds
+        @:param speed: Motion speed in rad/s
+        @:return: True if move sent to queue
         """
-        # Real motor values reported by controller
-        mot_vec = np.deg2rad(np.array(mot_list))
+        sys_mot_vec_current: np.ndarray = self.get_queue_motor()  # Current queued motor position vector. Degrees and millimeters.
+        print(f"sys_motor_move: Current: {sys_mot_vec_current}")
 
-        # Update states
-        self._manipulator.update_state(mot_vec[:6])  # 6 axis
-        self._linear_base.update_state(mot_vec[6:7])  # 1 axis
+        # Construct absolute target vector
+        sys_mot_vec_target = sys_mot_vec_current.copy()
+        if incremental:  # Add
+            if mot_vec_manipulator is not None:
+                sys_mot_vec_target[:6] += np.rad2deg(mot_vec_manipulator[:6].copy())
+            if mot_vec_linear_axis is not None:
+                sys_mot_vec_target[6:7] += 1000 * mot_vec_linear_axis.copy()
 
-        ops_vec_base: Pose = self._manipulator.ops_coords
-        pose_base_to_world = self._linear_base.world_to_base.inverse()
-        # TODO: Understand why
-        ops_vec_world: Pose = ops_vec_base.relative_to(pose_base_to_world)
+        else:  # Override
+            if mot_vec_manipulator is not None:
+                sys_mot_vec_target[:6] = np.rad2deg(mot_vec_manipulator.copy())  # Target position in degrees
+            if mot_vec_linear_axis is not None:
+                sys_mot_vec_target[6:7] = 1000 * mot_vec_linear_axis.copy()  # Target position in millimeters
 
-        sing_vals_trans, sing_vecs_trans = self._manipulator.singular_vals_vecs_trans
-        sing_vals_rot, sing_vecs_rot = self._manipulator.singular_vals_vecs_rot
+        # Normalized direction vector
+        delta_mot_vec = sys_mot_vec_target - sys_mot_vec_current
+        delta_mot_vec_norm = LA.norm(delta_mot_vec)
+        dir_vec = delta_mot_vec / delta_mot_vec_norm
 
-        # Condition
-        # TODO: Fix base and world
-        cond_world = self._manipulator._compute_condition(np.eye(3))
-        cond_base = self._manipulator._compute_condition(np.eye(3))
-        cond_tool = self._manipulator._compute_condition(ops_vec_base.rot_mat)
-
-        jnt_vec_deg = np.zeros(8)
-        jnt_vec_deg[:6] = np.rad2deg(self._manipulator.jnt_coords)
-        jnt_vec_deg[6:7] = 1000 * self._linear_base.jnt_coords
-
-        state = {
-            'mot_coords_deg': np.array(mot_list),
-            'jnt_coords_deg': jnt_vec_deg,
-            'ops_coords_base': ops_vec_base,
-            'ops_coords_world': ops_vec_world,
-            'condition_world': cond_world,
-            'condition_base': cond_base,
-            'condition_tool': cond_tool,
-            'sing_vals_trans': sing_vals_trans,
-            'sing_vecs_trans': sing_vecs_trans,
-            'sing_vals_rot': sing_vals_rot,
-            'sing_vecs_rot': sing_vecs_rot,
-        }
-        return state
-
-    def move_single_jnt_linear_axis(self, jnt_idx: int, distance: float, speed: float, incremental=False) -> bool:
-        if (jnt_idx + 1) > N_LIN_JNT:
-            print("Invalid joint index")
+        # Define feedrate
+        if speed is not None:
+            feedrate: float = utils.rad_sec2deg_min(speed)
+        elif time is not None:
+            feedrate: float = 60 * delta_mot_vec_norm / time  # mm/min and deg/min
+        else:
+            self.send_terminal.emit("No speed or time given.")
             return False
 
-        # Fetch temporary absolute joint coordinates
-        jnt_vec_current = self._linear_base.temp_jnt_coords
+        # Scale down speeds such that no motor exceeds its maximum speed
+        mot_dir_vec = np.abs(dir_vec)
+        for idx in range(8):
+            if mot_dir_vec[idx] > 1e6:  # Avoid near zero denominator
+                feedrate = min(MOTOR_MAX_SPEED[f"M{idx+1}"] / mot_dir_vec[idx], feedrate)
 
-        # Construct target joint vector
-        jnt_vec_target = jnt_vec_current.copy()
-        jnt_vec_target[jnt_idx] = distance
+        # Set queued state
+        self._manipulator.state.queued.motor_state = np.deg2rad(sys_mot_vec_target[:6])
 
-        # Compute movement time
-        move_time_s = abs((distance - jnt_vec_current[jnt_idx]) / speed)
+        return self.write_g_code(sys_mot_vec_target, feedrate)
 
-        mot_vec = self._linear_base.move_jnt(jnt_vec_target)
-        if mot_vec is None:
-            return False
-
-        # Send to g_code_writer
-        jnt_vec_target_mm = np.zeros(8)
-        jnt_vec_target_mm[6:7] = 1000 * mot_vec
-        jnt_vec_current_mm = np.zeros(8)
-        jnt_vec_current_mm[6:7] = 1000 * jnt_vec_current
-        self.write_g_code(jnt_vec_target_mm, jnt_vec_current_mm, move_time_s)
-
-        return True
-
-    def move_single_jnt_manipulator(self, jnt_idx: int, angle: float, speed: float, incremental=False) -> bool:
-        """ Gets a single joint motion instruction from API. Let manipulator and linear axis verify motion,
-        then propagate forward to g-code writer.
-        @param jnt_idx: Index of joint to move (0-7)
-        @param angle: Angle to move to, radians
-        @param speed: , Speed to move at, radians/second
-        @param incremental: Only absolute motion for now
+    def move_jnt(self, jnt_vec: np.ndarray, time: float | None = None, speed: float | None = None, degrees: bool = False) -> bool:
+        """ Move 8-joint
+        @:param jnt_vec: 8-vector, radians and meters
+        @:param time: Motion time in seconds
+        @:param speed: Motion speed in rad/s
         """
-        if (jnt_idx+1) > N_REV_JNT:
-            print("Invalid joint index")
+        mot_vec_manipulator_rad = jnt_vec[:6]
+        mot_vec_linear_axis_m = jnt_vec[6:7]
+
+        mot_vec_man = self._manipulator.move_jnt(mot_vec_manipulator_rad, degrees)
+        if mot_vec_man is None:
+            return False
+        mot_vec_lin = self._linear_axis.move_jnt(mot_vec_linear_axis_m)
+        if mot_vec_lin is None:
             return False
 
-        # Fetch temporary absolute joint coordinates
-        jnt_vec_current = self._manipulator.temp_jnt_coords
-        # TODO: Fix this mess
-        mot_vec_current = self._manipulator.temp_mot_coords
-
-        # Construct target joint vector
-        jnt_vec_target = jnt_vec_current.copy()
-        jnt_vec_target[jnt_idx] = angle
-
-        # Compute movement time
-        move_time_s = abs((angle - jnt_vec_current[jnt_idx]) / speed)
-        print(f"New: {np.rad2deg(angle)}\tCurrent: {np.rad2deg(jnt_vec_current[jnt_idx])}")
-
-        mot_vec = self._manipulator.move_jnt(jnt_vec_target)
-        if mot_vec is None:
-            return False
-
-        # Send to g_code_writer
-        # jnt_vec_target_deg = np.zeros(8)
-        # jnt_vec_target_deg[:6] = np.rad2deg(mot_vec)
-        # jnt_vec_current_deg = np.zeros(8)
-        # jnt_vec_current_deg[:6] = np.rad2deg(jnt_vec_current)
-        # self.write_g_code(jnt_vec_target_deg, jnt_vec_current_deg, move_time_s)
-        mot_vec_target_deg = np.zeros(8)
-        mot_vec_target_deg[:6] = np.rad2deg(mot_vec)
-        mot_vec_current_deg = np.zeros(8)
-        mot_vec_current_deg[:6] = np.rad2deg(mot_vec_current)
-        self.write_g_code(mot_vec_target_deg, mot_vec_current_deg, move_time_s)
-
-        return True
-
-    def move_jnt(self, jnt_vec: np.ndarray, time: float, degrees: bool = False, incremental: bool = False) -> bool:
-        """ Move 8-joint """
-        mot_vec_manipulator_rad = np.deg2rad(jnt_vec[:6])
-
-        mot_vec = self._manipulator.move_jnt(mot_vec_manipulator_rad, degrees, incremental)
-        if mot_vec is None:
-            return False
-
-        mot_vec_deg = np.zeros(8)
-        mot_vec_deg[:6] = np.rad2deg(mot_vec)
         # Send to serial
-        self.write_g_code(mot_vec_deg, self._sys_mot_vec, time)
+        self.sys_motor_move(mot_vec_manipulator=mot_vec_man, mot_vec_linear_axis=mot_vec_lin, time=time, speed=speed)
+
         return True
 
     def move_ops_lin_7d(self, ops_vec: np.ndarray, time: float, criteria: int, incremental: bool = False) -> bool:
@@ -346,30 +166,24 @@ class ManipulatorManager(QObject):
         """
         # q_dot = J^-1 * x_dot
 
+
     def translate_tool(self, direction_vec: tuple[int, int, int], distance: float, speed: float, frame: str) -> bool:
         """ Creates a pure translation along any axis in any frame.
         :param direction_vec: Translation axis, any length
-        :param distance: Translation distance, meters by default
+        :param distance: Translation distance, meters
         :param speed: Translation speed, meters/second
         :param frame: Frame direction vector is described in. "World", "Base" or "Tool"
-        :param millimeters: Units for distance
         """
         # Compute list of G-code for translational move
         mot_vecs, segment_time = self._manipulator.translate_tool(direction_vec, distance, speed, frame)
         if mot_vecs is None:
+            self.send_terminal("Translation failed.")
             return False
 
-        # TODO: Fix
-        # Pad with zerosNx6 -> Nx8
-        mot_vecs = np.rad2deg(mot_vecs)
-        mot_vecs = np.hstack((mot_vecs, np.zeros((mot_vecs.shape[0], 2))))
-
         # Send G-code to serial
-        mot_vec_prev = np.zeros(8)
-        mot_vec_prev[:6] = self._manipulator.mot_coords
         for vec in mot_vecs:
-            self.write_g_code(vec, mot_vec_prev, segment_time)
-            mot_vec_prev = vec
+            # self.write_g_code(vec, mot_vec_prev, segment_time)
+            self.sys_motor_move(mot_vec_manipulator=vec, time=segment_time)
 
         return True
 
@@ -383,20 +197,66 @@ class ManipulatorManager(QObject):
         # Compute list of G-code for rotational move
         mot_vecs, segment_time = self._manipulator.rotate_tool(direction_vec, angle, speed, frame)
         if mot_vecs is None:
+            self.send_terminal("Rotation failed.")
             return False
 
-        # TODO: Fix
-        # Pad with zerosNx6 -> Nx8
-        mot_vecs = np.rad2deg(mot_vecs)
-        mot_vecs = np.hstack((mot_vecs, np.zeros((mot_vecs.shape[0], 2))))
-
         # Send G-code to serial
-        mot_vec_prev = np.zeros(8)
-        mot_vec_prev[:6] = self._manipulator.mot_coords
         for vec in mot_vecs:
-            self.write_g_code(vec, mot_vec_prev, segment_time)
-            mot_vec_prev = vec
+            self.sys_motor_move(mot_vec_manipulator=vec, time=segment_time)
 
         return True
+
     def reset(self):
         self._manipulator.reset()
+
+    def update_status(self, mot_list: list):
+        """ Update system status and return by dictionary.
+        @param status: str, controller status
+        @param mot_list: List of 8 floats, motor positions as degrees
+        """
+        # Real motor values reported by controller
+        mot_vec = np.array(mot_list)  # Degrees and millimeters
+
+        # Update states
+        self._manipulator.update_state(np.deg2rad(mot_vec[:6]))  # 6 axis
+        self._linear_axis.update_state(0.001 * mot_vec[6:7])  # 1 axis
+
+        ops_pose_base: Pose = self._manipulator.state.mcu.ops_state
+
+
+        # TODO: Bring back Pose and understand this
+        # pose_base_to_world = self._linear_axis.state.mcu.base_pose.inverse()
+        # ops_pose_world: Pose = ops_pose_base.relative_to(pose_base_to_world)
+        ops_pose_world = ops_pose_base.copy()
+        ops_pose_world.position += self._linear_axis.state.mcu.position
+
+        sing_vals_trans, sing_vecs_trans = self._manipulator.state.mcu.singular_data_translation
+        sing_vals_rot, sing_vecs_rot = self._manipulator.state.mcu.singular_data_rotation
+
+        # Condition
+        # TODO: Fix base and world
+        cond_world = self._manipulator._compute_condition(np.eye(3))
+        cond_base = self._manipulator._compute_condition(np.eye(3))
+        cond_tool = self._manipulator._compute_condition(ops_pose_base.rot_mat)
+
+        jnt_vec_deg = np.zeros(8)
+        jnt_vec_deg[:6] = np.rad2deg(self._manipulator.state.mcu.joint_state)
+        jnt_vec_deg[6:7] = 1000 * self._linear_axis.state.mcu.joint_state
+
+        # print(f"Update: jnt_vec_deg: {jnt_vec_deg}")
+        # print(f"Update: mot_list: {mot_list}")
+
+        state = {
+            'mot_coords_deg': np.array(mot_list),
+            'jnt_coords_deg': jnt_vec_deg,
+            'ops_coords_base': ops_pose_base,
+            'ops_coords_world': ops_pose_world,
+            'condition_world': cond_world,
+            'condition_base': cond_base,
+            'condition_tool': cond_tool,
+            'sing_vals_trans': sing_vals_trans,
+            'sing_vecs_trans': sing_vecs_trans,
+            'sing_vals_rot': sing_vals_rot,
+            'sing_vecs_rot': sing_vecs_rot,
+        }
+        return state

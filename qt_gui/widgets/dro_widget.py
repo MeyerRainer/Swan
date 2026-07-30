@@ -5,6 +5,7 @@ Author: Rainer Meyer, rot.meyer494@gmail.com
 import numpy as np
 from PyQt6.QtWidgets import QWidget, QGridLayout, QLabel, QGroupBox, QVBoxLayout, QHBoxLayout, QComboBox
 import config
+from robot_math.quaternion import Quaternion
 
 
 class DROWidget(QWidget):
@@ -215,21 +216,21 @@ class DROWidget(QWidget):
         # Orientation
         frame_orientation = self.frame_select_orientation.currentText()
         if frame_orientation == 'World':
-            quaternion: np.ndarray = status['ops_coords_world'].quaternion
+            quaternion: Quaternion = status['ops_coords_world'].quaternion
             zyz: np.ndarray = status['ops_coords_world'].zyz_euler
         elif frame_orientation == "Base":
-            quaternion: np.ndarray = status['ops_coords_base'].quaternion
+            quaternion: Quaternion = status['ops_coords_base'].quaternion
             zyz: np.ndarray = status['ops_coords_base'].zyz_euler
         elif frame_orientation == "Tool":
-            quaternion = np.array((1., 0., 0., 0.))
+            quaternion = Quaternion.identity()
             zyz: np.ndarray = np.zeros(3)
         else:
             raise ValueError("Invalid frame")
 
-        self.quaternion_w.setText(f"{quaternion[0]:.3f}")
-        self.quaternion_i.setText(f"{quaternion[1]:.3f}")
-        self.quaternion_j.setText(f"{quaternion[2]:.3f}")
-        self.quaternion_k.setText(f"{quaternion[3]:.3f}")
+        self.quaternion_w.setText(f"{quaternion.w:.3f}")
+        self.quaternion_i.setText(f"{quaternion.x:.3f}")
+        self.quaternion_j.setText(f"{quaternion.y:.3f}")
+        self.quaternion_k.setText(f"{quaternion.z:.3f}")
 
         self.zyz_euler_1.setText(f"{zyz[0]:.3f}")
         self.zyz_euler_2.setText(f"{zyz[1]:.3f}")

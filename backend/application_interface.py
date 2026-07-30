@@ -70,6 +70,7 @@ class ApplicationInterface(QObject):
         self._program_control.run_button.clicked.connect(self.execute_program)
 
         # ======================================== Control panel =========================================
+        self._control.home_button.clicked.connect(self.home)
         # Translation
         self._control.x_plus.clicked.connect(lambda: self.manipulator.translate_tool((1, 0, 0), self._control.increment_linear.value() / 1000, utils.mm_min2m_s(self._control.speed_linear.value()), self._control.frame_select_position.currentText()))
         self._control.x_minus.clicked.connect(lambda: self.manipulator.translate_tool((-1, 0, 0), self._control.increment_linear.value() / 1000, utils.mm_min2m_s(self._control.speed_linear.value()), self._control.frame_select_position.currentText()))
@@ -89,17 +90,15 @@ class ApplicationInterface(QObject):
         self._control.rz_plus.clicked.connect(lambda: self.manipulator.rotate_tool((0, 0, 1), np.deg2rad(self._control.increment_angular.value()), utils.deg_min2rad_sec(self._control.speed_angular.value()), self._control.frame_select_orientation.currentText()))
         self._control.rz_minus.clicked.connect(lambda: self.manipulator.rotate_tool((0, 0, -1), np.deg2rad(self._control.increment_angular.value()), utils.deg_min2rad_sec(self._control.speed_angular.value()), self._control.frame_select_orientation.currentText()))
         # Manipulator joints
-        self._control.j1_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(0, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
-        self._control.j2_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(1, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
-        self._control.j3_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(2, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
-        self._control.j4_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(3, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
-        self._control.j5_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(4, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
-        self._control.j6_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(5, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
-        # self._control.j7_slider.connect_target(lambda val: self.manipulator.move_single_jnt_manipulator(6, angle=np.deg2rad(val), speed=utils.deg_min2rad_sec(self._control.speed_joint.value())))
-        # Linear axis joints
-        self._control.jl1_slider.connect_target(lambda val: self.manipulator.move_single_jnt_linear_axis(0, distance=0.001*val, speed=utils.mm_min2m_s(self._control.speed_joint.value())))
-        # self._control.jl2_slider.connect_target(lambda val: self.manipulator.move_single_jnt_linear_axis(0, distance=0.001*val, speed=utils.mm_min2m_s(self._control.speed_joint.value())))
-
+        self._control.j1_slider.connect_target(self.read_sliders)
+        self._control.j2_slider.connect_target(self.read_sliders)
+        self._control.j3_slider.connect_target(self.read_sliders)
+        self._control.j4_slider.connect_target(self.read_sliders)
+        self._control.j5_slider.connect_target(self.read_sliders)
+        self._control.j6_slider.connect_target(self.read_sliders)
+        # self._control.j7_slider.connect_target(self.read_sliders)
+        self._control.jl1_slider.connect_target(self.read_sliders)
+        # self._control.jl2_slider.connect_target(self.read_sliders)
 
     def connect_signals(self):
         # --- Backend -> GUI ---
@@ -214,3 +213,23 @@ class ApplicationInterface(QObject):
             self._camera.connect()
         else:
             self._camera.disconnect()
+
+    def read_sliders(self):
+        # Revolute
+        j1 = np.deg2rad(self._control.j1_slider.value())
+        j2 = np.deg2rad(self._control.j2_slider.value())
+        j3 = np.deg2rad(self._control.j3_slider.value())
+        j4 = np.deg2rad(self._control.j4_slider.value())
+        j5 = np.deg2rad(self._control.j5_slider.value())
+        j6 = np.deg2rad(self._control.j6_slider.value())
+        # Linear
+        j7 = 0.001 * self._control.jl1_slider.value()
+        j8 = 0.001 * self._control.jl2_slider.value()
+
+        jnt_vec = np.array([j1, j2, j3, j4, j5, j6, j7, j8])
+        speed = utils.deg_min2rad_sec(self._control.speed_joint.value())
+
+        self.manipulator.move_jnt(jnt_vec, time=None, speed=speed)
+
+    def home(self):
+        self.manipulator.move_jnt(np.zeros(8), time=None, speed=utils.deg_min2rad_sec(self._control.speed_joint.value()))

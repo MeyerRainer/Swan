@@ -1,10 +1,8 @@
 """ Pose 6D (position + orientation in 3D) """
-from __future__ import annotations  # Must be the very first line of code
-
-import copy
+from __future__ import annotations
 
 from backend import utils
-from typing import List
+from robot_math.quaternion import Quaternion
 import numpy as np
 
 
@@ -16,11 +14,7 @@ class Pose:
         self._rot_mat = rotation_matrix.copy()
 
     def __repr__(self):
-        return (
-            f"Pose("
-            f"position={self._position!r}, "
-            f"quaternion={self.quaternion!r})"
-        )
+        return "Not implemented"
 
     def __copy__(self):
         return Pose(self._position, self._rot_mat)
@@ -33,11 +27,11 @@ class Pose:
 
     @classmethod
     def from_position(cls, pos):
-        return cls(position=pos, rotation_matrix=np.eye(3))
+        return cls(position=pos, rotation_matrix=np.eye(3, dtype=np.float64))
 
     @classmethod
-    def from_quaternion(cls, pos, quat):
-        R = utils.quat2rot_mat(quat)
+    def from_quaternion(cls, pos: np.ndarray, quat: Quaternion):
+        R = quat.to_rotation_matrix()
         return cls(position=pos, rotation_matrix=R)
 
     @classmethod
@@ -62,7 +56,8 @@ class Pose:
 
     @property
     def quaternion(self):
-        return utils.rot_mat2quat(self._rot_mat)
+        # return utils.rot_mat2quat(self._rot_mat)
+        return Quaternion.from_rotation_matrix(self._rot_mat)
 
     @property
     def rot_mat(self):
@@ -87,14 +82,15 @@ class Pose:
 
     # Set orientation with quaternion
     @quaternion.setter
-    def quaternion(self, quat):
-        if quat.shape != (4,):
-            raise ValueError(f"Expected shape (4,), got {quat.shape} instead.")
-        norm = np.linalg.norm(quat)
-        if norm < 1e-3:
-            raise ValueError("Zero length quaternion")
-        quat /= norm
-        self.rot_mat = utils.quat2rot_mat(quat)
+    def quaternion(self, quat: Quaternion):
+        # if quat.shape != (4,):
+        #     raise ValueError(f"Expected shape (4,), got {quat.shape} instead.")
+        # norm = np.linalg.norm(quat)
+        # if norm < 1e-3:
+        #     raise ValueError("Zero length quaternion")
+        # quat /= norm
+        # self.rot_mat = utils.quat2rot_mat(quat)
+        self._rot_mat = quat.to_rotation_matrix()
 
     @rot_mat.setter
     def rot_mat(self, R: np.ndarray):
@@ -151,50 +147,17 @@ class Pose:
     def relative_to(self, other: Pose):
         return other.inverse().compose(self)
 
-    # transform_point()
-    #
-    # interpolate()
-    #
     def distance(self, other: Pose):
         return np.linalg.norm((self.position - other.position))
 
     def angle(self, other: Pose):
-        similarity = np.clip(np.dot(self.quaternion, other.quaternion), -1, 1)
-        similarity = abs(similarity)
-        return 2 * np.acos(similarity)
+        return self.quaternion.angle(other.quaternion)
 
-    # def interpolate(self, other: Pose, segment_size_m: float, segment_size_rad: float) -> List[Pose]:
-    #     poses = []
-    #
-    #     start_pos = a.position
-    #     start_quat = a.quaternion
-    #     end_pos = b.position
-    #     end_quat = b.quaternion
-    #
-    #     # Translational error, meters
-    #     transl = end_pos - start_pos
-    #     transl_norm = LA.norm(transl)
-    #     n_segments_lin = int(np.ceil(transl_norm / segment_size_m))
-    #
-    #     # Rotational error, radians
-    #     similarity = np.clip(np.dot(start_quat, end_quat), -1, 1)
-    #     if similarity < 0:
-    #         end_quat *= -1
-    #         similarity *= -1
-    #     rotation_dist = 2 * math.acos(similarity)
-    #     n_segments_ang = int(np.ceil(rotation_dist / segment_size_rad))
-    #
-    #     # Choose whether rotation or translation determines segment count
-    #     n_segments = max(n_segments_lin, n_segments_ang)
-    #     assert n_segments >= 1, "Pose interpolator: no segments!"
-    #
-    #     for idx in range(n_segments):
-    #         t = (idx + 1) / n_segments  # Interpolation parameter in range ]0, 1]
-    #         pos_idx = start_pos + t * transl  # Interpolated position
-    #         quat_idx = slerp(start_quat, end_quat, t)  # Interp. orientation
-    #         poses.append(Pose(np.hstack((pos_idx, quat_idx))))
-    #
-    #     return poses
+    def interpolate(self, other: Pose, t: float = 0.5) -> Pose:
+        """ Interpolates an intermediate pose between self and other at interpolation parameter t∈[0, 1] """
+        inter_position = self.position + t * (other.position - self.position)
+        inter_quaternion = self.quaternion.slerp(other.quaternion, t)
+        return Pose.from_quaternion(pos=inter_position, quat=inter_quaternion)
 
     def is_close(self, other: Pose):
         return np.allclose(self.SE3, other.SE3, rtol=1e-5)

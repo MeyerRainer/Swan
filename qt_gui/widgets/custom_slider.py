@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QSlider
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QEvent
 
 STYLE = """
     /* ================= ACTIVE STATE ================= */
@@ -40,60 +40,146 @@ STYLE = """
     }
 """
 
+# class CustomSlider(QWidget):
+#     """
+#     A reusable widget containing:
+#     [Left Label] --- [Slider] --- [Right Value Label]
+#     """
+#
+#     def __init__(self, name, min_val: int = 0, max_val: int = 100, default_val: int = 10, parent=None):
+#
+#         super().__init__(parent)
+#
+#         # Internal state to track dragging
+#         self._is_dragging = False
+#         self.callback = None
+#
+#         # Setup Layout
+#         layout = QHBoxLayout()
+#         layout.setContentsMargins(0, 0, 0, 0)  # Tight alignment
+#
+#         # 1. Left Name Label
+#         self.name_label = QLabel(name, self)
+#         layout.addWidget(self.name_label)
+#
+#         # 2. The Slider
+#         self.slider = QSlider(Qt.Orientation.Horizontal, self)
+#         self.slider.setMaximumHeight(14)
+#         self.slider.setStyleSheet(STYLE)
+#         self.slider.setMinimum(min_val)
+#         self.slider.setMaximum(max_val)
+#         self.slider.setValue(default_val)
+#         layout.addWidget(self.slider)
+#
+#         # 3. Right Value Label (Updates continuously)
+#         self.value_label = QLabel(str(self.slider.value()), self)
+#         self.value_label.setFixedWidth(40)  # Prevent UI shifting as numbers change
+#         self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+#         layout.addWidget(self.value_label)
+#
+#         self.setLayout(layout)
+#
+#         # Connect internal signals for live label updates and drag tracking
+#         self.slider.sliderPressed.connect(self._on_pressed)
+#         self.slider.sliderReleased.connect(self._on_released)
+#         self.slider.valueChanged.connect(self._on_value_changed)
+#
+#     def value(self):
+#         return self.slider.value()
+#
+#     def set_steps(self, single_step, page_step):
+#         """Easily configure step sizes from external widgets or logic."""
+#         self.slider.setSingleStep(single_step)
+#         self.slider.setPageStep(page_step)
+#
+#     def connect_target(self, callback_func):
+#         """Registers the external function you want to execute."""
+#         self.callback = callback_func
+#
+#     def set_value(self, value: float):
+#         self.slider.blockSignals(True)
+#         self.slider.setValue(int(round(value)))
+#         self.value_label.setText("{:.2f}".format(value))
+#         self.slider.blockSignals(False)
+#
+#     def set_enabled(self, enabled: bool):
+#         self.slider.setEnabled(enabled)
+#
+#     def _on_pressed(self):
+#         self._is_dragging = True
+#         print(f"Slider dragging on")
+#
+#     def _on_released(self):
+#         self._is_dragging = False
+#         # 3. Dragging release: trigger heavy function once
+#         if self.callback:
+#             # self.callback(self.slider.value())
+#             print(f"Released. Callback")
+#             self.callback()
+#
+#     def _on_value_changed(self, value):
+#         # Always update the right side text immediately
+#         self.value_label.setText(str(value))
+#         # 1 & 2: Arrow keys/Scrolling trigger function immediately (if not dragging)
+#         if not self._is_dragging and self.callback:
+#             print("Callback")
+#             # self.callback(value)
+#             self.callback()
+
 class CustomSlider(QWidget):
-    """
-    A reusable widget containing:
-    [Left Label] --- [Slider] --- [Right Value Label]
-    """
 
     def __init__(self, name, min_val: int = 0, max_val: int = 100, default_val: int = 10, parent=None):
 
         super().__init__(parent)
 
-        # Internal state to track dragging
         self._is_dragging = False
         self.callback = None
 
-        # Setup Layout
         layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)  # Tight alignment
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        # 1. Left Name Label
         self.name_label = QLabel(name, self)
         layout.addWidget(self.name_label)
 
-        # 2. The Slider
         self.slider = QSlider(Qt.Orientation.Horizontal, self)
         self.slider.setMaximumHeight(14)
-        self.slider.setStyleSheet(STYLE)
+        # self.slider.setStyleSheet(STYLE)
         self.slider.setMinimum(min_val)
         self.slider.setMaximum(max_val)
         self.slider.setValue(default_val)
         layout.addWidget(self.slider)
 
-        # 3. Right Value Label (Updates continuously)
+        # Right Value Label
         self.value_label = QLabel(str(self.slider.value()), self)
-        self.value_label.setFixedWidth(40)  # Prevent UI shifting as numbers change
+        self.value_label.setFixedWidth(40)
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.value_label)
 
         self.setLayout(layout)
 
-        # Connect internal signals for live label updates and drag tracking
+        # Intercept mouse events BEFORE QSlider updates value
+        self.slider.installEventFilter(self)
+
+        # Connect internal signals
         self.slider.sliderPressed.connect(self._on_pressed)
         self.slider.sliderReleased.connect(self._on_released)
         self.slider.valueChanged.connect(self._on_value_changed)
+
+    def eventFilter(self, obj, event):
+        """Intercept MouseButtonPress on the slider track to flag dragging early."""
+        if obj == self.slider and event.type() == QEvent.Type.MouseButtonPress:
+            if event.button() == Qt.MouseButton.LeftButton:
+                self._is_dragging = True
+        return super().eventFilter(obj, event)
 
     def value(self):
         return self.slider.value()
 
     def set_steps(self, single_step, page_step):
-        """Easily configure step sizes from external widgets or logic."""
         self.slider.setSingleStep(single_step)
         self.slider.setPageStep(page_step)
 
     def connect_target(self, callback_func):
-        """Registers the external function you want to execute."""
         self.callback = callback_func
 
     def set_value(self, value: float):
@@ -110,14 +196,13 @@ class CustomSlider(QWidget):
 
     def _on_released(self):
         self._is_dragging = False
-        # 3. Dragging release: trigger heavy function once
         if self.callback:
-            self.callback(self.slider.value())
+            self.callback()
 
     def _on_value_changed(self, value):
-        # Always update the right side text immediately
         self.value_label.setText(str(value))
 
-        # 1 & 2: Arrow keys/Scrolling trigger function immediately (if not dragging)
-        if not self._is_dragging and self.callback:
-            self.callback(value)
+        # Check either internal drag state or Qt's sliderDown state
+        if not self._is_dragging and not self.slider.isSliderDown():
+            if self.callback:
+                self.callback()

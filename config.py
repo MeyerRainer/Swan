@@ -1,17 +1,11 @@
 """
 Configuration file for parameters
+
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
 
 import math
 import numpy as np
-
-
-TWO_PI = 2*math.pi
-PI = math.pi
-HALF_PI = math.pi / 2
-QUARTER_PI = math.pi / 4
-THREE_PI_FOUR = 3 * math.pi / 4
 
 # Linear base DOF's
 LINEAR_AXIS = ['X']
@@ -90,12 +84,12 @@ FRAMES = ("World", "Base", "Tool")
 
 # Denavit-Hartenberg parameters
 DH_PARAMS = {
-            'a1': 0.030,
-            'a2': 0.160,
-            'a3': 0.035,
-            'd1': 0.130,
-            'd4': 0.195,
-            'd6': 0.0353}
+            'a1': np.float64(0.030),
+            'a2': np.float64(0.160),
+            'a3': np.float64(0.035),
+            'd1': np.float64(0.130),
+            'd4': np.float64(0.195),
+            'd6': np.float64(0.0353)}
 
 
 # Tool frame respect to J6 frame
@@ -103,28 +97,28 @@ TOOL_OFS = np.array([
     [1., 0., 0., 0.000],
     [0., 1., 0., 0.000],
     [0., 0., 1., 0.035],
-    [0., 0., 0., 1.000]])
-# TOOL_OFS[:3, :3] = utils.zyz2rot_mat(np.array([0, -math.pi/4, 0]))
+    [0., 0., 0., 1.000]], dtype=np.float64)
+# TOOL_OFS[:3, :3] = utils.zyz2rot_mat(np.array([0, -math.pi/4, 0]), dtype=np.float64)
 
 INV_TOOL_OFS = np.linalg.inv(TOOL_OFS)
 
 # GUI Defaults
-LINEAR_SPEED_MIN = 10  # mm/min
-LINEAR_SPEED_DEFAULT = 1200  # mm/min
-LINEAR_SPEED_MAX = 4000  # mm/min
+LINEAR_SPEED_MIN: int = 10  # mm/min
+LINEAR_SPEED_DEFAULT: int = 1200  # mm/min
+LINEAR_SPEED_MAX: int = 4000  # mm/min
 
-ANGULAR_SPEED_MIN = 10  # deg/min
-ANGULAR_SPEED_DEFAULT = 1200  # deg/min
-ANGULAR_SPEED_MAX = 4000  # deg/min
+ANGULAR_SPEED_MIN: int = 10  # deg/min
+ANGULAR_SPEED_DEFAULT: int = 1200  # deg/min
+ANGULAR_SPEED_MAX: int = 4000  # deg/min
 
-JOINT_SPEED_MIN = 10  # deg/sec
-JOINT_SPEED_DEFAULT = 600  # deg/sec
-JOINT_SPEED_MAX = 4000  # deg/sec
+JOINT_SPEED_MIN: int = 10  # deg/sec
+JOINT_SPEED_DEFAULT: int = 600  # deg/sec
+JOINT_SPEED_MAX: int = 4000  # deg/sec
 
-LINEAR_INCREMENT = 10  # mm
-ANGULAR_INCREMENT = 10  # deg
-JOINT_INCREMENT_SCROLL = 1  # deg
-JOINT_INCREMENT_ARROW_KEY = 5  # deg
+LINEAR_INCREMENT: int = 10  # mm
+ANGULAR_INCREMENT: int = 10  # deg
+JOINT_INCREMENT_SCROLL: int = 1  # deg
+JOINT_INCREMENT_ARROW_KEY: int = 5  # deg
 
 
 # Reductions (For reference only):

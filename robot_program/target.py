@@ -1,4 +1,4 @@
-from backend.pose import Pose
+from robot_math.pose import Pose
 
 from dataclasses import dataclass
 import numpy as np
