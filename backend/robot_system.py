@@ -10,14 +10,13 @@ from backend.g_code_writer import GCodeWriter
 from robot_math.pose import Pose
 from config import *
 from backend import utils
-# from backend.system_state import SystemState
 from typing import Tuple
 import numpy as np
 import numpy.linalg as LA
 from PyQt6.QtCore import QObject, pyqtSignal
 
 
-class ManipulatorManager(QObject):
+class RobotSystem(QObject):
 
     g_code_generated = pyqtSignal(str)
     send_terminal = pyqtSignal(str)

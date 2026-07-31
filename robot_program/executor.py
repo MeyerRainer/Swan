@@ -1,4 +1,4 @@
-from backend.manipulator_manager import ManipulatorManager
+from backend.robot_system import RobotSystem
 from robot_program.program import Program
 from robot_program.target import Target
 from robot_program.instructions.motion import *
@@ -10,7 +10,7 @@ import numpy as np
 
 class InstructionExecutor:
 
-    def __init__(self, parent: ManipulatorManager):
+    def __init__(self, parent: RobotSystem):
         self.manipulator = parent
 
     def execute(self, program: Program):

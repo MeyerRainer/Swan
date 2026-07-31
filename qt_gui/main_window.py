@@ -1,14 +1,18 @@
 """ MainWindow for Swan app. High level assembly of GUI.
-Author: Rainer Meyer, rot.meyer494@gmail.com
-"""
-from PyQt6.QtGui import QIcon
 
+Author: Rainer Meyer, r.meyer494@gmail.com
+"""
 from backend import application_interface
 from qt_gui.toolbar import MainToolbar
 from qt_gui.docks import *
+from qt_gui.widgets.control_widget import ControlWidget
+from qt_gui.widgets.dro_widget import DROWidget
+from qt_gui.widgets.program_widget import ProgramWidget
+from qt_gui.widgets.teach_widget import TeachWidget
 from qt_gui.viewport.view_3d import View3D
 from qt_gui.viewport.camera_widget import CameraWidget
 
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QMainWindow, QApplication
 from PyQt6.QtCore import Qt, QSettings, QDir, pyqtSlot
 from PyQt6.QtWidgets import QTabWidget
@@ -17,21 +21,28 @@ from PyQt6.QtWidgets import QTabWidget
 class MainWindow(QMainWindow):
 
     def __init__(self):
+
         super().__init__()
 
         self.settings = QSettings("Meyer", "Swan")
-
-
 
         # Toolbar
         self.toolbar = MainToolbar()
 
         # Docks
-        self.control = ControlDock()
-        self.dro = DRODock()
         self.terminal = TerminalDock()
-        self.teach_interface = TeachDock()
-        self.program_control = ProgramDock(initial_dir=self.settings.value("last_directory", QDir.homePath()))
+        self.left_dock = LeftDock()
+        self.right_dock = RightDock()
+
+        self.program_control = ProgramWidget(initial_dir=self.settings.value("last_directory", QDir.homePath()))
+        self.control = ControlWidget()
+        self.dro = DROWidget()
+        self.teach_interface = TeachWidget()
+
+        self.left_dock.tabs.addTab(self.control, "Control")
+        self.left_dock.tabs.addTab(self.program_control, "Program")
+        self.right_dock.tabs.addTab(self.dro, "DRO")
+        self.right_dock.tabs.addTab(self.teach_interface, "Teach")
 
         # Viewport
         self.view_3d = View3D()
@@ -76,11 +87,9 @@ class MainWindow(QMainWindow):
         tools_menu.addAction("Restore default layout", self.restore_default_layout)
         # View
         view_menu = menubar.addMenu("View")
-        view_menu.addAction(self.control.toggleViewAction())
-        view_menu.addAction(self.dro.toggleViewAction())
         view_menu.addAction(self.terminal.toggleViewAction())
-        view_menu.addAction(self.teach_interface.toggleViewAction())
-        view_menu.addAction(self.program_control.toggleViewAction())
+        view_menu.addAction(self.left_dock.toggleViewAction())
+        view_menu.addAction(self.right_dock.toggleViewAction())
         help_menu = menubar.addMenu("Help")
 
     def build_ui(self):
@@ -96,15 +105,9 @@ class MainWindow(QMainWindow):
         self.setCorner(Qt.Corner.BottomRightCorner, Qt.DockWidgetArea.RightDockWidgetArea)
 
         # Add docks
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.control)
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.program_control)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dro)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.teach_interface)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.left_dock)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.right_dock)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.terminal)
-
-        # Tabify
-        self.tabifyDockWidget(self.program_control, self.control)
-        self.tabifyDockWidget(self.teach_interface, self.dro)
 
         # Set viewport as central widget
         self.setCentralWidget(self.viewport_tabs)

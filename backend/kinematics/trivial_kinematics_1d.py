@@ -5,7 +5,7 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 
 import numpy as np
-from typing import Tuple, List, Union
+from typing import List
 
 class TrivKins1D:
 
@@ -32,7 +32,7 @@ class TrivKins1D:
             elif axis == 'Z':
                 base_coords[2] += jnt_vec[idx]
 
-        print(f"Forward kins: Joints in: {jnt_vec}\tPosition out: {base_coords}")
+        # print(f"Forward kins: Joints in: {jnt_vec}\tPosition out: {base_coords}")
         return base_coords
 
     def inverse(self, target: np.ndarray) -> np.ndarray:
