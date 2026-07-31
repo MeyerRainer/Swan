@@ -4,13 +4,16 @@ Author: Rainer Meyer, rot.meyer494@gmail.com
 """
 from math import atan2
 
-from robot_math.pose import Pose
+# from robot_math.pose import Pose
 
 from typing import List, Tuple
 import numpy as np
 import numpy.linalg as LA
 import math
 import re
+
+import tinyobjloader
+
 
 def mm_min2m_s(mm_min):
     """ Conversion from mm/min to m/s
@@ -266,42 +269,73 @@ def parse_grbl_status(line: str):
 
     return status, m_pos, w_pos
 
-def pose_interpolator(a: Pose, b: Pose, segment_size_m: float = 0.001, segment_size_rad: float = 0.0035, segment_count: int = None) -> list[Pose] | None:
+def load_obj_for_opengl(file_path):
+    # 1. Initialize Reader and Load File
+    reader = tinyobjloader.ObjReader()
+    config = tinyobjloader.ObjReaderConfig()
+    config.triangulate = True  # Automatically convert quads/n-gons into triangles
 
-    poses: List[Pose] = []
+    if not reader.ParseFromFile(file_path, config):
+        raise RuntimeError(f"Failed to load OBJ: {reader.Error()}")
 
-    if a.is_close(b):
-        return None
+    attrib = reader.GetAttrib()
+    shapes = reader.GetShapes()
 
-    start_pos = a.position
-    start_quat = a.quaternion
-    end_pos = b.position
-    end_quat = b.quaternion
+    # Temporal lists for parsing
+    interleaved_vertices = []
+    indices = []
 
-    # Translational error, meters
-    transl = end_pos - start_pos
-    transl_norm = LA.norm(transl)
-    n_segments_lin = int(np.ceil(transl_norm / segment_size_m))
+    # Map (v_idx, vt_idx, vn_idx) tuple -> unique OpenGL index
+    vertex_map = {}
 
-    if segment_count is not None:
-        n_segments = segment_count
-    else:
-        # Rotational error, radians
-        similarity = np.clip(np.dot(start_quat, end_quat), -1, 1)
-        if similarity < 0:
-            end_quat *= -1
-            similarity *= -1
-        rotation_dist = 2 * math.acos(similarity)
-        n_segments_ang = int(np.ceil(rotation_dist / segment_size_rad))
+    # Extract raw float lists from attrib
+    positions = attrib.vertices  # Flat list: [x0, y0, z0, x1, y1, z1, ...]
+    texcoords = attrib.texcoords  # Flat list: [u0, v0, u1, v1, ...]
+    normals = attrib.normals  # Flat list: [nx0, ny0, nz0, nx1, ny1, nz1, ...]
 
-        # Choose whether rotation or translation determines segment count
-        n_segments = max(n_segments_lin, n_segments_ang)
+    # 2. Iterate through shapes and faces to unroll OBJ indices
+    for shape in shapes:
+        for idx in shape.mesh.indices:
+            v_idx = idx.vertex_index
+            vt_idx = idx.texcoord_index
+            vn_idx = idx.normal_index
 
-    for idx in range(n_segments):
-        t = (idx + 1) / n_segments  # Interpolation parameter in range ]0, 1]
-        pose_interp: Pose = Pose.identity()
-        pose_interp.position = start_pos + t * transl  # Interpolated position
-        pose_interp.quaternion = slerp(start_quat, end_quat, t)  # Interp. orientation
-        poses.append(pose_interp)
+            key = (v_idx, vt_idx, vn_idx)
 
-    return poses
+            if key in vertex_map:
+                # Reuse existing combined vertex index
+                indices.append(vertex_map[key])
+            else:
+                # Assign a new OpenGL vertex index
+                new_index = len(vertex_map)
+                vertex_map[key] = new_index
+                indices.append(new_index)
+
+                # Extract Position (x, y, z)
+                px = positions[3 * v_idx]
+                py = positions[3 * v_idx + 1]
+                pz = positions[3 * v_idx + 2]
+
+                # Extract TexCoord (u, v) - Fall back to (0,0) if missing
+                if vt_idx >= 0:
+                    u = texcoords[2 * vt_idx]
+                    v = texcoords[2 * vt_idx + 1]
+                else:
+                    u, v = 0.0, 0.0
+
+                # Extract Normal (nx, ny, nz) - Fall back to (0,0,0) if missing
+                if vn_idx >= 0:
+                    nx = normals[3 * vn_idx]
+                    ny = normals[3 * vn_idx + 1]
+                    nz = normals[3 * vn_idx + 2]
+                else:
+                    nx, ny, nz = 0.0, 0.0, 0.0
+
+                # Pack attribute components sequentially into interleaved list
+                interleaved_vertices.extend([px, py, pz, u, v, nx, ny, nz])
+
+    # Convert to contiguous float32/uint32 NumPy arrays for OpenGL
+    vertex_data = np.array(interleaved_vertices, dtype=np.float32)
+    index_data = np.array(indices, dtype=np.uint32)
+
+    return vertex_data, index_data

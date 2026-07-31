@@ -6,7 +6,8 @@ from backend.robot_system import RobotSystem
 from backend.camera_manager import CameraManager
 from backend.vision_manager import VisionManager
 from backend.gc_serial import GCSerial
-from backend import utils
+import utils
+from qt_gui.viewport.scene import *
 
 from robot_program import parser
 from robot_program.executor import InstructionExecutor
@@ -31,6 +32,7 @@ class ApplicationInterface(QObject):
         self.robot_sys = RobotSystem()
         self.camera = CameraManager()
         self.vision = VisionManager()
+        self.scene = SceneTreeModel(root=SceneNode(name="Scene"))
         self.program_parser = parser.ProgramParser()
         self.program = None
         self.executor = InstructionExecutor(parent=self.robot_sys)

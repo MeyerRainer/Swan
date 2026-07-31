@@ -22,6 +22,10 @@ class Quaternion:
         self._y = float(y)
         self._z = float(z)
 
+    @classmethod
+    def from_iterable(cls, components):
+        return cls(components[0], components[1], components[2], components[3])
+
     # --- Properties (Immutable) ---
     @property
     def w(self) -> float:

@@ -6,12 +6,11 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 
 import config
 from config import *
-from backend import utils
+import utils
 from robot_math.pose import Pose
 
-from typing import Tuple, List, Union
+from typing import Tuple, Union
 import numpy as np
-import math
 
 IK_SOLUTION = {
     "SUCCESS": 0,

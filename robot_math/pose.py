@@ -1,7 +1,7 @@
 """ Pose 6D (position + orientation in 3D) """
 from __future__ import annotations
 
-from backend import utils
+import utils
 from robot_math.quaternion import Quaternion
 import numpy as np
 

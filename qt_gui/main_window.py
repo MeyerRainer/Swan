@@ -5,7 +5,9 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 from backend import application_interface
 from qt_gui.toolbar import MainToolbar
 from qt_gui.docks import *
+from qt_gui.viewport.opengl_viewport import OpenGLViewport
 from qt_gui.widgets.control_widget import ControlWidget
+from qt_gui.widgets.scene_widget import SceneWidget
 from qt_gui.widgets.dro_widget import DROWidget
 from qt_gui.widgets.program_widget import ProgramWidget
 from qt_gui.widgets.teach_widget import TeachWidget
@@ -35,6 +37,7 @@ class MainWindow(QMainWindow):
         self.right_dock = RightDock()
 
         self.program_control = ProgramWidget(initial_dir=self.settings.value("last_directory", QDir.homePath()))
+
         self.control = ControlWidget()
         self.dro = DROWidget()
         self.teach_interface = TeachWidget()
@@ -47,14 +50,19 @@ class MainWindow(QMainWindow):
         # Viewport
         self.view_3d = View3D()
         self.view_camera = CameraWidget()
+        self.view_scene = OpenGLViewport()
         self.viewport_tabs = QTabWidget()
         self.viewport_tabs.addTab(self.view_3d, "3D")
         self.viewport_tabs.addTab(self.view_camera, "Camera")
+        self.viewport_tabs.addTab(self.view_scene, "Scene")
 
         self.setCentralWidget(self.viewport_tabs)
 
         # Application interface
         self.api = application_interface.ApplicationInterface(self)
+        # TODO: Move up
+        self.scene_widget = SceneWidget(self.api.scene)
+        self.left_dock.tabs.addTab(self.scene_widget, "Scene")
 
         # Allow for nested docking
         self.setDockNestingEnabled(True)

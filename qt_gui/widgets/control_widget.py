@@ -1,6 +1,7 @@
 """
 Class for control panel widget.
-Author: Rainer Meyer, rot.meyer494@gmail.com
+
+Author: Rainer Meyer, r.meyer494@gmail.com
 """
 
 import config
@@ -38,6 +39,7 @@ slider_style = """
 class ControlWidget(QWidget):
 
     def __init__(self):
+
         super().__init__()
 
         self.setMinimumWidth(360)

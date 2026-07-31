@@ -5,15 +5,12 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 import config
 from config import *
-from backend import utils
-from robot_math.pose import Pose
 from robot_math.quaternion import Quaternion
 from backend.manipulator_state import *
 from backend.kinematics.anthropomorphic_spherical_wrist import ASWKinematics
 
-import math
-from math import pi, sin, cos, atan, sqrt, fabs
-from typing import Tuple, Union
+from math import sqrt, fabs
+from typing import Tuple
 import numpy as np
 from numpy import linalg as LA
 

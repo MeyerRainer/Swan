@@ -5,12 +5,10 @@ Author: Rainer Meyer, rot.meyer494@gmail.com
 
 from backend.manipulator import Manipulator
 from backend.linear_axis import LinearAxis
-from backend.manipulator import IK_SOLUTION
 from backend.g_code_writer import GCodeWriter
 from robot_math.pose import Pose
 from config import *
-from backend import utils
-from typing import Tuple
+import utils
 import numpy as np
 import numpy.linalg as LA
 from PyQt6.QtCore import QObject, pyqtSignal
