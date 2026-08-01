@@ -5,19 +5,20 @@ from qt_gui.viewport.visuals.gizmo import *
 from qt_gui.viewport.scene import Scene
 from qt_gui.viewport.opengl.shader import *
 
+import qt_gui.viewport.cg_math as cg_math
+
 from typing import override
-import sys
 import math
-import numpy as np
 from OpenGL import GL
 from PyQt6.QtCore import Qt, QTimer, QRect
-from PyQt6.QtWidgets import QApplication, QMainWindow
 from PyQt6.QtGui import QSurfaceFormat, QMatrix4x4, QVector3D, QVector2D
 
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 
 class OpenGLViewport(QOpenGLWidget):
+
     def __init__(self, parent=None):
+
         super().__init__(parent)
 
         # Camera State
@@ -25,6 +26,8 @@ class OpenGLViewport(QOpenGLWidget):
         self.camera_yaw = math.radians(315)
         self.camera_pitch = math.radians(30)
         self.last_mouse_pos = None
+
+        self.body_frame = True
 
         # Scene Entities
         self.cube = None
@@ -107,49 +110,27 @@ class OpenGLViewport(QOpenGLWidget):
         GL.glUniformMatrix4fv(proj_loc, 1, GL.GL_FALSE, proj.data())
         GL.glUniformMatrix4fv(view_loc, 1, GL.GL_FALSE, view.data())
 
-
-        # 1. Draw Grid and axis
+        # Draw elements
         self.grid.draw(model_loc)
         self.world_frame_origin.draw(model_loc)
-
-        # 2. Draw Scene Mesh
         self.cube.draw(model_loc)
-
-        # 3. Draw Gizmo (Handles its own depth state)
-        self.gizmo.draw(model_loc)
+        self.gizmo.draw(model_loc, body_frame=self.body_frame)
 
     @override
     def resizeGL(self, w, h):
         dpr = self.devicePixelRatio()
         GL.glViewport(0, 0, int(w * dpr), int(h * dpr))
 
-    def get_mouse_ray(self, pos):
-        """ Get the mouse ray location and direction in 3d space
-        """
-        proj, view = self.get_matrices()
-        dpr = self.devicePixelRatio()
-
-        # Pixel coordinates. Origo = left down
-        win_x = pos.x() * dpr
-        win_y = (self.height() - pos.y()) * dpr
-
-        viewport = QRect(0, 0, int(self.width() * dpr), int(self.height() * dpr))
-
-        # Far and near point of ray in world coordinates
-        near_pt = QVector3D(win_x, win_y, 0.0).unproject(view, proj, viewport)
-        far_pt = QVector3D(win_x, win_y, 1.0).unproject(view, proj, viewport)
-        return near_pt, (far_pt - near_pt).normalized()
-
     # --- Mouse Handlers ---
     @override
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            ray_origin, ray_dir = self.get_mouse_ray(event.position())
+            ray_origin, ray_dir = cg_math.get_mouse_ray(viewport=self, pos=event.position())
 
             # Check if some gizmo has been hit
-            hit_translation_axis: HandleType = self.gizmo.hit_translation_axis(ray_origin, ray_dir)
-            hit_translation_plane: HandleType = self.gizmo.hit_translation_planes(ray_origin, ray_dir)
-            hit_rotation_ring: HandleType = self.gizmo.hit_rotation_rings(ray_origin, ray_dir)
+            hit_translation_axis: HandleType = self.gizmo.hit_translation_axis(ray_origin, ray_dir, body_frame=self.body_frame)
+            hit_translation_plane: HandleType = self.gizmo.hit_translation_planes(ray_origin, ray_dir, body_frame=self.body_frame)
+            hit_rotation_ring: HandleType = self.gizmo.hit_rotation_rings(ray_origin, ray_dir, body_frame=self.body_frame)
 
             # TODO: Add priority
             if hit_translation_axis != HandleType.NONE:
@@ -164,24 +145,24 @@ class OpenGLViewport(QOpenGLWidget):
             # Gizmo motion
             if axis != HandleType.NONE:
                 cam_pos = self.get_camera_position()
-                self.gizmo.start_drag(ray_origin, ray_dir, cam_pos, axis)
+                self.gizmo.start_drag(ray_origin, ray_dir, cam_pos, axis, body_frame=self.body_frame)
             else:
                 self.last_mouse_pos = event.position()
 
     @override
     def mouseMoveEvent(self, event):
-        pos = event.position()
+        event_pos = event.position()
 
         # Gizmo motion
         if self.gizmo.DC.mode != HandleType.NONE:
-            ray_origin, ray_dir = self.get_mouse_ray(pos)
-            self.gizmo.update_drag(ray_origin, ray_dir)
+            ray_origin, ray_dir = cg_math.get_mouse_ray(viewport=self, pos=event_pos)
+            self.gizmo.update_drag(ray_origin, ray_dir, body_frame=self.body_frame)
             self.update()
 
         elif self.last_mouse_pos is not None:
             # Orbit
-            delta = pos - self.last_mouse_pos
-            self.last_mouse_pos = pos
+            delta = event_pos - self.last_mouse_pos
+            self.last_mouse_pos = event_pos
             self.camera_yaw = self.constrain_yaw(self.camera_yaw - delta.x() * 0.01)
             self.camera_pitch += delta.y() * 0.01
             pitch_lim = math.radians(89)
