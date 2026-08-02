@@ -2,7 +2,6 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
-from backend import application_interface
 from qt_gui.toolbar import MainToolbar
 from qt_gui.docks import *
 from qt_gui.viewport.opengl_viewport import OpenGLViewport
@@ -32,20 +31,24 @@ class MainWindow(QMainWindow):
         self.toolbar = MainToolbar()
 
         # Docks
-        self.terminal = TerminalDock()
+        self.terminal_dock = TerminalDock()
         self.left_dock = LeftDock()
         self.right_dock = RightDock()
 
-        self.program_control = ProgramWidget(initial_dir=self.settings.value("last_directory", QDir.homePath()))
+        # Widgets
+        self.control_panel = ControlWidget()
+        self.program_panel = ProgramWidget(initial_dir=self.settings.value("last_directory", QDir.homePath()))
+        self.scene_panel = SceneWidget()
+        self.dro_panel = DROWidget()
+        self.teach_panel = TeachWidget()
+        self.terminal = self.terminal_dock.widget()
 
-        self.control = ControlWidget()
-        self.dro = DROWidget()
-        self.teach_interface = TeachWidget()
-
-        self.left_dock.tabs.addTab(self.control, "Control")
-        self.left_dock.tabs.addTab(self.program_control, "Program")
-        self.right_dock.tabs.addTab(self.dro, "DRO")
-        self.right_dock.tabs.addTab(self.teach_interface, "Teach")
+        # Tabify
+        self.left_dock.tabs.addTab(self.control_panel, "Control")
+        self.left_dock.tabs.addTab(self.program_panel, "Program")
+        self.left_dock.tabs.addTab(self.scene_panel, "Scene")
+        self.right_dock.tabs.addTab(self.dro_panel, "DRO")
+        self.right_dock.tabs.addTab(self.teach_panel, "Teach")
 
         # Viewport
         self.view_3d = View3D()
@@ -57,12 +60,6 @@ class MainWindow(QMainWindow):
         self.viewport_tabs.addTab(self.view_scene, "Scene")
 
         self.setCentralWidget(self.viewport_tabs)
-
-        # Application interface
-        self.api = application_interface.ApplicationInterface(self)
-        # TODO: Move up
-        self.scene_widget = SceneWidget(self.api.scene)
-        self.left_dock.tabs.addTab(self.scene_widget, "Scene")
 
         # Allow for nested docking
         self.setDockNestingEnabled(True)
@@ -95,7 +92,7 @@ class MainWindow(QMainWindow):
         tools_menu.addAction("Restore default layout", self.restore_default_layout)
         # View
         view_menu = menubar.addMenu("View")
-        view_menu.addAction(self.terminal.toggleViewAction())
+        view_menu.addAction(self.terminal_dock.toggleViewAction())
         view_menu.addAction(self.left_dock.toggleViewAction())
         view_menu.addAction(self.right_dock.toggleViewAction())
         help_menu = menubar.addMenu("Help")
@@ -115,7 +112,7 @@ class MainWindow(QMainWindow):
         # Add docks
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.left_dock)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.right_dock)
-        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.terminal)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.terminal_dock)
 
         # Set viewport as central widget
         self.setCentralWidget(self.viewport_tabs)

@@ -10,12 +10,11 @@ from qt_gui.viewport.scene import *
 
 class SceneWidget(QWidget):
 
-    def __init__(self, scene_tree_model):
+    def __init__(self):
 
         super().__init__()
 
         self.scene_tree = QTreeView()
-        self.scene_tree.setModel(scene_tree_model)
 
         self.collapse_all_button = QPushButton("Collapse ALl")
         self.expand_all_button = QPushButton("Expand All")

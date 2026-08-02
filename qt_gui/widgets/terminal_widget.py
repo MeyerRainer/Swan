@@ -1,6 +1,6 @@
-"""
-Class for terminal widget.
-Author: Rainer Meyer, rot.meyer494@gmail.com
+""" Class for terminal widget.
+
+Author: Rainer Meyer, r.meyer494@gmail.com
 """
 
 from PyQt6.QtCore import pyqtSignal

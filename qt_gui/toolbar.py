@@ -1,10 +1,10 @@
-"""
-Class for toolbar
-Author: Rainer Meyer, rot.meyer494@gmail.com
+""" Class for toolbar
+
+Author: Rainer Meyer, r.meyer494@gmail.com
 """
 
 from PyQt6.QtWidgets import QToolBar, QPushButton, QComboBox, QLabel
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 
 
 class MainToolbar(QToolBar):
@@ -22,7 +22,7 @@ class MainToolbar(QToolBar):
                 "115200",
                 "230400"
         ])
-        self.baud_combo.setCurrentIndex(1)
+        self.baud_combo.setCurrentIndex(1)  # Auto by default.
 
         self.grbl_status_label = QLabel('')
         self.grbl_status_label.setMinimumWidth(40)
@@ -43,6 +43,12 @@ class MainToolbar(QToolBar):
         self.addWidget(self.grbl_status_label)
         self.addSeparator()
 
+    def on_serial_toggle(self, serial_connect: bool):
+        if serial_connect:
+            self.on_connect()
+        else:
+            self.disconnect()
+
     def on_connect(self):
         self.connect_button.setText("Disconnect")
         self.connect_button.setStyleSheet("background-color: green")
@@ -58,3 +64,7 @@ class MainToolbar(QToolBar):
             self.grbl_status_label.setStyleSheet("background-color: red")
 
         self.grbl_status_label.setText(status)
+
+    def display_ports(self, ports: list[str]):
+        self.port_combo.clear()
+        self.port_combo.addItems(ports)
