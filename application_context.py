@@ -14,8 +14,8 @@ class ApplicationContext:
         self.robot_sys = RobotSystem()
         self.camera = CameraManager()
         self.vision = VisionManager()
-        self.scene = SceneTreeModel(root=SceneNode(name="Scene"))
-        self.scene.read_folder('scene/')
+        self.scene = SceneGraph(root=SceneNode(name="Scene"))
+        self.scene.build_from_directory('scene/')
         # self.program = ProgramManager()
 
 

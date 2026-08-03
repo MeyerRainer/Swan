@@ -5,14 +5,15 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import override
 
 from PyQt6.QtCore import QAbstractItemModel, QModelIndex, Qt
 from PyQt6.QtGui import QIcon
 
 from robot_math.pose import Pose
-from qt_gui.viewport.visuals.visual import Visual
-
+from qt_gui.viewport.visuals.visual import Visual, Material, load_obj_file
+from dataclasses import dataclass, field
 
 class SceneNode:
 
@@ -33,6 +34,8 @@ class SceneNode:
         if parent is not None:
             parent.add_child(self)
 
+        # print(f"Node initialized")
+
     def add_child(self, child: SceneNode):
         child.parent = self
         self.children.append(child)
@@ -44,22 +47,64 @@ class SceneNode:
         return 0
 
 
-class Scene:
+# class Scene:
+#
+#     def __init__(self):
+#
+#         self.root = SceneNode("Scene")
 
-    def __init__(self):
 
-        self.root = SceneNode("Scene")
+class SceneGraph(QAbstractItemModel):
 
-
-class SceneTreeModel(QAbstractItemModel):
-
-    def __init__(self, root: SceneNode, parent=None):
+    def __init__(self, root: SceneNode | None = None, parent=None):
 
         super().__init__(parent)
-        self.root_node = root
+
+        self.root_node = root or SceneNode("Root")
+
+    @property
+    def root(self):
+        return self.root_node
+
+    def build_from_directory(self, dir_path: str | Path):
+        """Rebuilds the scene graph from a file system directory containing .obj models."""
+        path = Path(dir_path)
+        if not path.exists() or not path.is_dir():
+            raise ValueError(f"Invalid directory path: {dir_path}")
+
+        # Signal model reset to QTreeView
+        self.beginResetModel()
+
+        self.root_node = SceneNode(path.name)
+        self._populate_directory_tree(path, self.root_node)
+
+        self.endResetModel()
+
+    def _populate_directory_tree(self, current_path: Path, parent_node: SceneNode):
+        for entry in sorted(current_path.iterdir()):
+            if entry.is_dir():
+                # Folder node
+                dir_node = SceneNode(entry.name, parent=parent_node)
+                self._populate_directory_tree(entry, dir_node)
+
+            elif entry.suffix.lower() == ".obj":
+                # OBJ Model node
+                obj_node = SceneNode(entry.name, parent=parent_node)
+                visuals = load_obj_file(entry)
+
+                if len(visuals) == 1:
+                    # Single mesh OBJ
+                    obj_node.visual = visuals[0]
+                elif len(visuals) > 1:
+                    # Multi-shape OBJ: create child sub-mesh nodes
+                    for idx, vis in enumerate(visuals):
+                        sub_node = SceneNode(f"Mesh_{idx}", parent=obj_node)
+                        sub_node.visual = vis
 
     def node_from_index(self, index: QModelIndex) -> SceneNode:
-        """Helper to extract SceneNode from QModelIndex."""
+        """ Helper to extract SceneNode from QModelIndex.
+        :param index: ?
+        """
         if index.isValid():
             return index.internalPointer()
         return self.root_node

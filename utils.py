@@ -4,14 +4,10 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from math import atan2
 
-# from robot_math.pose import Pose
-
 from typing import List, Tuple
 import numpy as np
-import numpy.linalg as LA
 import math
 import re
-
 import tinyobjloader
 
 
@@ -275,7 +271,7 @@ def parse_grbl_status(line: str):
 
     return status, m_pos, w_pos
 
-def load_obj_for_opengl(file_path):
+def load_obj(file_path: str) -> Tuple[np.ndarray, np.ndarray]:
     # 1. Initialize Reader and Load File
     reader = tinyobjloader.ObjReader()
     config = tinyobjloader.ObjReaderConfig()

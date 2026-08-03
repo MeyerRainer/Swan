@@ -96,7 +96,8 @@ class ApplicationController(QObject):
         # self.main_window.program_panel.run_button.clicked.connect(self.execute_program)
 
         # ========================================= Scene panel ==========================================
-        # self.scene_tree.setModel(scene_tree_model)
+        self.main_window.scene_panel.scene_tree.setModel(self.app_context.scene)
+        self.main_window.view_scene.set_scene_provider(lambda: self.app_context.scene.root)
 
     def on_viewport_tab_change(self, index):
 
