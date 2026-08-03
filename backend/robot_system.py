@@ -28,6 +28,10 @@ class RobotSystem(QObject):
 
         self.gc_writer = GCodeWriter()
 
+        self.previous_pose: Pose = Pose.identity()
+        self.speed_linear_prev = 0.
+        self.speed_angular_prev = 0.
+
         # self.sys_state: SystemState = SystemState(self._manipulator.state, self._linear_axis.state)
 
     # def i_kin_7d(self, end_pose: Pose, quat_err: np.ndarray, criteria) -> Tuple[np.ndarray | None, IK_SOLUTION]:
@@ -80,7 +84,7 @@ class RobotSystem(QObject):
             feedrate=feedrate)
 
         self.g_code_generated.emit(g_code)
-        print(f"write_g_code: {g_code}")
+        # print(f"write_g_code: {g_code}")
 
         return True
 
@@ -95,7 +99,6 @@ class RobotSystem(QObject):
         @:return: True if move sent to queue
         """
         sys_mot_vec_current: np.ndarray = self.get_queue_motor()  # Current queued motor position vector. Degrees and millimeters.
-        print(f"sys_motor_move: Current: {sys_mot_vec_current}")
 
         # Construct absolute target vector
         sys_mot_vec_target = sys_mot_vec_current.copy()
@@ -206,10 +209,11 @@ class RobotSystem(QObject):
     def reset(self):
         self._manipulator.reset()
 
-    def update_status(self, mot_list: list):
+    def update_status(self, mot_list: list, delta_t: float):
         """ Update system status and return by dictionary.
-        @param status: str, controller status
-        @param mot_list: List of 8 floats, motor positions as degrees
+        @param status: str, controller status.
+        @param mot_list: List of 8 floats, motor positions as degrees.
+        @param delta_t: Time in seconds since last update.
         """
         # Real motor values reported by controller
         mot_vec = np.array(mot_list)  # Degrees and millimeters
@@ -240,8 +244,14 @@ class RobotSystem(QObject):
         jnt_vec_deg[:6] = np.rad2deg(self._manipulator.state.mcu.joint_state)
         jnt_vec_deg[6:7] = 1000 * self._linear_axis.state.mcu.joint_state
 
-        # print(f"Update: jnt_vec_deg: {jnt_vec_deg}")
-        # print(f"Update: mot_list: {mot_list}")
+        # delta_t = 0.1
+        alpha = 0.9
+        delta_x = LA.norm(ops_pose_base.position - self.previous_pose.position)
+        speed_linear: float = alpha*utils.m_s2mm_min(delta_x / delta_t) + (1-alpha)*self.speed_linear_prev
+        speed_angular: float = alpha*utils.rad_sec2deg_min(abs(ops_pose_base.quaternion.angle(self.previous_pose.quaternion)) / delta_t) + (1-alpha)*self.speed_angular_prev
+        self.speed_linear_prev, self.speed_angular_prev = speed_linear, speed_angular
+
+        self.previous_pose = ops_pose_base
 
         state = {
             'mot_coords_deg': np.array(mot_list),
@@ -255,5 +265,7 @@ class RobotSystem(QObject):
             'sing_vecs_trans': sing_vecs_trans,
             'sing_vals_rot': sing_vals_rot,
             'sing_vecs_rot': sing_vecs_rot,
+            'speed_linear': speed_linear,
+            'speed_angular': speed_angular,
         }
         return state

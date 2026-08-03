@@ -1,6 +1,6 @@
-"""
-Utility functions for Swan application.
-Author: Rainer Meyer, rot.meyer494@gmail.com
+""" Utility functions for Swan application.
+
+Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from math import atan2
 
@@ -15,11 +15,17 @@ import re
 import tinyobjloader
 
 
-def mm_min2m_s(mm_min):
-    """ Conversion from mm/min to m/s
-    @param mm_min: float, speed in millimeters per minute
+def mm_min2m_s(mm_min) -> float:
+    """ Conversion from mm/min to m/s.
+    @param mm_min: float, speed in millimeters per minute.
     """
     return mm_min / 60000
+
+def m_s2mm_min(m_s) -> float:
+    """ Conversion from m/s to mm/min.
+        @param m_s: float, speed in meters per second.
+        """
+    return m_s * 60000.
 
 def deg_min2rad_sec(deg_min):
     return deg_min * np.pi / 10800

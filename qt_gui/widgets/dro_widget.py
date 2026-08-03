@@ -47,6 +47,9 @@ class DROWidget(QWidget):
         self.condition_ry = QLabel("0.000")
         self.condition_rz = QLabel("0.000")
 
+        self.speed_linear = QLabel("0.000")
+        self.speed_angular = QLabel("0.000")
+
         self.jnt1 = QLabel("0.000")
         self.jnt2 = QLabel("0.000")
         self.jnt3 = QLabel("0.000")
@@ -127,6 +130,18 @@ class DROWidget(QWidget):
         v_layout_orientation.addLayout(g_layout_orientation)
         group_orientation.setLayout(v_layout_orientation)
 
+        # ======================================= Speeds ===========================================
+        group_speed = QGroupBox("Speed")
+
+        g_layout_speed = QGridLayout()
+
+        g_layout_speed.addWidget(QLabel("Linear speed"), 0, 0)
+        g_layout_speed.addWidget(QLabel("Angular speed"), 1, 0)
+        g_layout_speed.addWidget(self.speed_linear, 0, 1)
+        g_layout_speed.addWidget(self.speed_angular, 1, 1)
+
+        group_speed.setLayout(g_layout_speed)
+
         # ==================================== Joint & Motor =======================================
         group_jnt_mot = QGroupBox("Joint Motor")
         g_layout_jnt_mot = QGridLayout()
@@ -185,6 +200,7 @@ class DROWidget(QWidget):
         # Upper
         layout.addWidget(group_position)
         layout.addWidget(group_orientation)
+        layout.addWidget(group_speed)
 
         # Lower
         lower.addWidget(group_condition)
@@ -235,6 +251,10 @@ class DROWidget(QWidget):
         self.zyz_euler_1.setText(f"{zyz[0]:.3f}")
         self.zyz_euler_2.setText(f"{zyz[1]:.3f}")
         self.zyz_euler_3.setText(f"{zyz[2]:.3f}")
+
+        # Speeds
+        self.speed_linear.setText(f"{status['speed_linear']:.3f}")
+        self.speed_angular.setText(f"{status['speed_angular']:.3f}")
 
         # Condition
         frame_condition = self.frame_select_condition.currentText()

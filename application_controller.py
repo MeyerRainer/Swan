@@ -7,6 +7,7 @@ import utils
 from typing import Tuple
 from PyQt6.QtCore import QObject
 import numpy as np
+import time
 
 
 class ApplicationController(QObject):
@@ -17,6 +18,10 @@ class ApplicationController(QObject):
 
         self.main_window = main_window              # GUI
         self.app_context = application_context      # Application state
+
+        self._time_s = time.monotonic()
+
+        # self.app_context.program
 
         # Initialize
         self.connect_signals()
@@ -139,12 +144,16 @@ class ApplicationController(QObject):
         """ Upon receiving status from GRBL, update complete system status
         @param grbl_status_str: str, GRBL-styled status message
         """
+        time_s: float = time.monotonic()
+        delta_t = time_s - self._time_s
+        self._time_s = time_s
+
         # Update robot state
         status, m_pos, w_pos = utils.parse_grbl_status(grbl_status_str)
         self.main_window.toolbar.update_status(status)
 
         # Update manipulator state
-        status_dict: dict = self.app_context.robot_sys.update_status(m_pos)
+        status_dict: dict = self.app_context.robot_sys.update_status(m_pos, delta_t)
 
         # Update digital readout
         self.main_window.dro_panel.update_status(status_dict)
