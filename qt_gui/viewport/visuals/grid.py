@@ -1,3 +1,8 @@
+""" Grid visual.
+
+Author: Rainer Meyer, r.meyer494@gmail.com
+"""
+
 import OpenGL.GL as GL
 import numpy as np
 from PyQt6.QtGui import QMatrix4x4
@@ -45,7 +50,7 @@ class Grid:
     GL.glBufferData(GL.GL_ARRAY_BUFFER, data.nbytes, data, GL.GL_STATIC_DRAW)
 
     # Position Attribute (Location 0)
-    GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, 24, GL.GLvoidp(0)    )
+    GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, 24, GL.GLvoidp(0))
     GL.glEnableVertexAttribArray(0)
 
     # Color Attribute (Location 1)

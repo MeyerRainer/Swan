@@ -1,3 +1,9 @@
+""" Scene graph renderer.
+
+Author: Rainer Meyer, r.meyer494@gmail.com
+"""
+
+
 from qt_gui.viewport.scene import SceneNode
 from qt_gui.viewport.opengl.shader import *
 from qt_gui.viewport.visuals.visual import Visual
@@ -17,7 +23,8 @@ class SceneRenderer:
         self.shader_program = None
 
     def initialize(self):
-        """Called once when the OpenGL context is valid."""
+        """ Called once when the OpenGL context is valid.
+        """
         # Compile shaders, set up lighting parameters, depth tests
         GL.glEnable(GL.GL_DEPTH_TEST)
         GL.glDisable(GL.GL_CULL_FACE)
@@ -35,8 +42,9 @@ class SceneRenderer:
         GL.glShaderSource(f, FRAGMENT_SHADER_SRC)
         GL.glCompileShader(f)
 
-        print(f"Vertex shaders: {GL.glGetShaderInfoLog(v)}")
-        print(f"Fragment shaders: {GL.glGetShaderInfoLog(f)}")
+        # Debug.
+        # print(f"Vertex shaders: {GL.glGetShaderInfoLog(v)}")
+        # print(f"Fragment shaders: {GL.glGetShaderInfoLog(f)}")
 
         self.shader_program = GL.glCreateProgram()
 
@@ -47,12 +55,14 @@ class SceneRenderer:
         GL.glDeleteShader(v)
         GL.glDeleteShader(f)
 
-    def resize(self, width: int, height: int):
-        """Called when viewport dimensions change."""
+    @staticmethod
+    def resize(width: int, height: int):
+        """Called when viewport dimensions change.
+        """
         GL.glViewport(0, 0, width, height)
         # Update projection matrices if needed
 
-    def render_scene(self, root_node: SceneNode, matrices: Tuple[QMatrix4x4, QMatrix4x4]):
+    def render_scene(self, root_node: SceneNode, projection_matrix: QMatrix4x4, view_matrix: QMatrix4x4):
 
         # Full clear on every frame
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
@@ -60,14 +70,6 @@ class SceneRenderer:
 
         if not root_node:
             return
-
-        # 2. FIX: Create View & Projection matrices so geometry isn't clipped
-        aspect_ratio = 1.0
-        viewport = GL.glGetIntegerv(GL.GL_VIEWPORT)
-        if viewport[3] > 0:
-            aspect_ratio = viewport[2] / viewport[3]
-
-        proj, view = matrices
 
         # Identity model matrix for root
         model = QMatrix4x4()
@@ -79,10 +81,9 @@ class SceneRenderer:
         view_loc: int = GL.glGetUniformLocation(self.shader_program, "view")
 
         if proj_loc != -1:
-            # QMatrix4x4.data() needs transpose=True for OpenGL column-major expectations
-            GL.glUniformMatrix4fv(proj_loc, 1, GL.GL_FALSE, proj.data())
+            GL.glUniformMatrix4fv(proj_loc, 1, GL.GL_FALSE, projection_matrix.data())
         if view_loc != -1:
-            GL.glUniformMatrix4fv(view_loc, 1, GL.GL_FALSE, view.data())
+            GL.glUniformMatrix4fv(view_loc, 1, GL.GL_FALSE, view_matrix.data())
 
         self._draw_node(root_node, parent_transform=model)
 
@@ -155,7 +156,8 @@ class SceneRenderer:
         }
 
     def cleanup(self):
-        """Free GPU resources when context is destroyed."""
+        """ Free GPU resources when context is destroyed.
+        """
         for handles in self._gpu_cache.values():
             GL.glDeleteVertexArrays(1, [handles["vao"]])
             GL.glDeleteBuffers(2, [handles["vbo"], handles["ebo"]])

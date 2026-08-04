@@ -1,3 +1,8 @@
+""" Class for a scene object.
+
+Author: Rainer Meyer, r.meyer494@gmail.com
+"""
+
 import numpy as np
 from pathlib import Path
 import tinyobjloader
