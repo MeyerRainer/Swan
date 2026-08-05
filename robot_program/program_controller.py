@@ -7,9 +7,10 @@ from robot_program.program import Program
 from robot_program.writer import ProgramWriter
 
 
-class ProgramManager(QWidget):
+class ProgramController(QWidget):
 
     write_terminal = pyqtSignal(str)
+    sgn_program_loaded = pyqtSignal(str, str)  # File name and contents
 
     def __init__(self, robot_sys):
 
@@ -22,8 +23,24 @@ class ProgramManager(QWidget):
 
         self.program: Program | None = None
 
-    def load_program(self, file: str, extension: str):
-        self.program = self.parser.parse(file, extension)
+    @property
+    def program_loaded(self):
+        return self.program is not None
+
+    # def load_program(self, file: str, extension: str):
+    #     self.program = self.parser.parse(file, extension)
+    #     self.write_terminal.emit(f"Program loaded: {self.program.name}")
+
+    def load_program(self, file_name: str, extension: str):
+
+        file: str = file_name + extension
+
+        with open(file) as f:
+            contents = f.read()
+
+        self.program: Program = self.parser.parse(contents)
+
+        self.sgn_program_loaded.emit(file, contents)  # Send to Program panel
         self.write_terminal.emit(f"Program loaded: {self.program.name}")
 
     def get_program(self) -> Program:

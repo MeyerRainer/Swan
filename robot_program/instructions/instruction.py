@@ -9,3 +9,10 @@ class Instruction(ABC):
     line: int  # Line number
 
     pass
+
+# class Instruction:
+#
+#     def __init__(self, line: int):
+#
+#         self.line: int = line
+#

@@ -1,5 +1,8 @@
 from abc import ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any, List
+
+from robot_program.instructions.instruction import Instruction
 
 
 class Condition(ABC):
@@ -17,3 +20,10 @@ class DigitalInputCondition(Condition):
         self.signal = signal
 
     signal: str
+
+
+@dataclass
+class IfCondition(Instruction):
+    condition: Any
+    body: List[Instruction] = field(default_factory=list)
+    line: int

@@ -1,10 +1,17 @@
 # Targets
 Home = JointTarget(0, 0, 0, 0, 0, 0, 0, 0)
-target_1 = JointTarget(10, 10, 10, 0, 0, 0, 0, 0)
+
+q_target1 = JointTarget(10, 10, 10, 0, 0, 0, 0, 0)
+#x_target1 = PoseTarget(200, 0, 200, 180, -90, 0)
+
 
 # Main program
 MoveJ(Home)
-MoveJ(target_1)
+
+MoveJ(q_target1)
+
+#MovePoseJ(x_target1)
+#MovePoseL
 
 if DI("part_present"):
     MoveJ(Home)

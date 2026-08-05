@@ -90,10 +90,16 @@ class ApplicationController(QObject):
         self.app_context.vision.processed_frame.connect(self.main_window.view_camera.show_frame)
 
         # ======================================== Program panel =========================================
-        # self.main_window.program_panel.run_button.clicked.connect(self.app_context.execute_program)
-        # self.main_window.program_panel.directory_changed.connect(self.main_window.save_last_directory)
-        # self.main_window.program_panel.file_loaded.connect(self.load_program)
-        # self.main_window.program_panel.run_button.clicked.connect(self.execute_program)
+        # GUI -> Context
+        self.main_window.program_panel.run_button.clicked.connect(self.app_context.program_controller.execute_program)
+        self.main_window.program_panel.sgn_open_file.connect(self.app_context.program_controller.load_program)
+        self.main_window.program_panel.directory_changed.connect(self.main_window.save_last_directory)
+        self.main_window.program_panel.write_terminal.connect(self.main_window.terminal.write)
+        # Context -> GUI
+        self.app_context.program_controller.executor.current_lineno.connect(self.main_window.program_panel.on_lineno_change)
+        # self.app_context.program_controller.parser.sgn_file_loaded.connect(self.main_window.program_panel.on_file_load)
+        self.app_context.program_controller.sgn_program_loaded.connect(self.main_window.program_panel.on_file_load)
+        self.app_context.program_controller.write_terminal.connect(self.main_window.terminal.write)
 
         # ========================================= Scene panel ==========================================
         self.main_window.scene_panel.scene_tree.setModel(self.app_context.scene)
@@ -153,6 +159,7 @@ class ApplicationController(QObject):
         status, m_pos, w_pos = utils.parse_grbl_status(grbl_status_str)
         self.main_window.toolbar.update_status(status)
 
+        # TODO: Simplify to: main_window.update_status() and app_context.update_status()?
         # Update manipulator state
         status_dict: dict = self.app_context.robot_sys.update_status(m_pos, delta_t)
 

@@ -1,105 +1,138 @@
-from abc import ABC, abstractmethod
-import ast
+from robot_program.instructions.timing import WaitSeconds
 from robot_program.program import Program
 from robot_program.target import Target
 from robot_program.instructions.motion import *
 from robot_program.instructions.flow import *
 from robot_program.condition import *
-from robot_program.instructions.timing import *
+
+from typing import Any, Optional
+import ast
 import numpy as np
 
-ALLOWED_STATEMENTS = {
-    ast.Assign,
-    ast.Expr,
-    ast.If,
-    ast.While,
-    ast.Break,
-    ast.Continue,
-    ast.Return,
-    ast.FunctionDef,
-}
+# ALLOWED_STATEMENTS = {
+#     ast.Assign,
+#     ast.Expr,
+#     ast.If,
+#     ast.For,
+#     ast.While,
+#     ast.Break,
+#     ast.Continue,
+#     ast.Return,
+#     ast.FunctionDef,
+#     ast.Call,
+# }
+#
+# # Custom functions for controlling robot system
+# ALLOWED_FUNCTIONS = {
+#     "MoveJ",
+#     "MovePoseJ",
+#     "MovePoseX",
+#     "Wait",
+#     "SetDO",
+#     "DI",
+#     "JointTarget",
+#     "PoseTarget",
+# }
 
-ALLOWED_FUNCTIONS = {
-    "MoveJ",
-    "MoveL",
-    "MoveC",
-    "Wait",
-    "SetDO",
-    "DI",
-    "JointTarget",
-    "PoseTarget",
-}
 
-
-class ProgramParser:
+class ProgramParser(ast.NodeVisitor):
 
     def __init__(self):
 
-        self.program: Program | None = None
+        self.program = Program()
 
-    def parse(self, file_name: str, extension: str) -> Program:
-        file: str = file_name + extension
+    def parse(self, code_str: str) -> Program:
+        """ Parses Python source code into an internal Program representation.
+        """
 
-        with open(file) as f:
-            tree: ast.Module = ast.parse(f.read())
-
-        self.program = Program(name=file_name)
-
-        # Recursively parse abstract syntax tree
-        self.program.instructions = self.parse_block(tree.body)
-
+        ast_root: ast.Module = ast.parse(code_str)
+        self.visit(ast_root)
         return self.program
 
-    def parse_block(self, statements: list[ast.stmt]) -> list[Instruction]:
+    def visit_Assign(self, node: ast.Assign):
+        """Handles target definitions and variable assignments:
+        home = TargetJ(0, 0, 0, 0, 0, 0)
+        """
+        target_name = node.targets[0].id  # Left side variable name
+        value_node = node.value
 
-        instructions = []
+        # Check if right-hand side is a Target creation
+        if isinstance(value_node, ast.Call) and isinstance(value_node.func, ast.Name):
+            func_name = value_node.func.id
 
-        for statement in statements:
-            instructions.append(self.parse_statement(statement))
+            if func_name == "TargetJ":
+                # Evaluate static numerical arguments for joint angles
+                args = [ast.literal_eval(arg) for arg in value_node.args]
+                target_obj = Target(name=target_name, joints=np.array(args))
+                self.program.targets[target_name] = target_obj
+                return
 
-        return instructions
+        # Regular variable assignments fallback
+        if isinstance(value_node, ast.Constant):
+            self.program.variables[target_name] = value_node.value
 
-    def parse_statement(self, stmt: ast.stmt) -> Instruction | None:
+    def visit_Expr(self, node: ast.Expr):
+        """Handles standalone commands like MoveJ(home) or Wait(1.5)."""
+        if isinstance(node.value, ast.Call):
+            instr = self._parse_instruction_call(node.value, node.lineno)
+            if instr:
+                self.program.instructions.append(instr)
 
-        # Invalid statement
-        if type(stmt) not in ALLOWED_STATEMENTS:
-            raise SyntaxError(f"{type(stmt).__name__} is not part of the Swan language.")
+    # TODO
+        if isinstance(node.value, ast.Assign):
+            instr = self._parse_assignment_call(node.value, node.lineno)
+            if instr:
+                self.program.targets['kk'] = instr
 
-        # Assignment
-        if isinstance(stmt, ast.Assign):
-            return self.parse_assignment(stmt)
+    def visit_If(self, node: ast.If):
+        """Handles control flow blocks: if DigitalIn('sensor1'): ..."""
+        condition = self._parse_condition(node.test)
 
-        # Expression
-        if isinstance(stmt, ast.Expr):
-            expr = stmt.value
+        # Save outer scope instruction list and parse inner block
+        outer_instructions = self.program.instructions
+        self.program.instructions = []
 
-            # Function call
-            if isinstance(expr, ast.Call):
-                if not isinstance(expr.func, ast.Name):
-                    raise SyntaxError(f"Expected function name, line {expr.lineno}.")
+        for body_stmt in node.body:
+            self.visit(body_stmt)
 
-                function_name = expr.func.id
+        inner_instructions = self.program.instructions
+        self.program.instructions = outer_instructions
 
-                if function_name not in ALLOWED_FUNCTIONS:
-                    raise SyntaxError(f"Unknown robot instruction '{function_name}', line {expr.lineno}.")
+        self.program.instructions.append(IfCondition(condition=condition, body=inner_instructions, line=node.lineno))
 
-                return self.parse_call(expr, stmt.lineno)
+    def _parse_instruction_call(self, call_node: ast.Call, lineno: int) -> Optional[Instruction]:
+        """Translates ast.Call nodes to custom robot Instructions."""
+        func_name = call_node.func.id
 
-        # If-statement
-        elif isinstance(stmt, ast.If):
-            condition = self.parse_condition(stmt.test)
-            body = self.parse_block(stmt.body)
-            return If(line=stmt.lineno, condition=condition, body=body)
+        if func_name == "MoveJ":
+            target_arg = call_node.args[0]
+            if isinstance(target_arg, ast.Name):
+                target_name = target_arg.id
+                target = self.program.targets.get(target_name, Target(name=target_name))
+                return MoveJ(target=target, line=lineno)
 
-        # While-loop
-        elif isinstance(stmt, ast.While):
-            condition = self.parse_condition(stmt.test)
-            body = self.parse_block(stmt.body)
-            return While(line=stmt.lineno, condition=condition, body=body)
+        elif func_name == "Wait":
+            seconds = ast.literal_eval(call_node.args[0])
+            return WaitSeconds(seconds=seconds, line=lineno)
 
         return None
 
-    def parse_assignment(self, stmt: ast.Assign) -> None:
+    def _parse_condition(self, test_node: ast.AST) -> Any:
+        """Parses condition expressions into Condition objects."""
+        # Handles DigitalIn("signal_name")
+        if isinstance(test_node, ast.Call) and isinstance(test_node.func, ast.Name):
+            if test_node.func.id == "DigitalIn":
+                signal = ast.literal_eval(test_node.args[0])
+                return DigitalInputCondition(signal=signal)
+
+        # Handles unary operations like: `not DigitalIn(...)`
+        if isinstance(test_node, ast.UnaryOp) and isinstance(test_node.op, ast.Not):
+            inner_cond = self._parse_condition(test_node.operand)
+            return "NOT", inner_cond
+
+        return None
+
+    def _parse_assignment(self, stmt: ast.Assign) -> None:
 
         if len(stmt.targets) != 1:
             raise SyntaxError(f"Only single assignments are supported, line {stmt.lineno}.")
@@ -129,58 +162,3 @@ class ProgramParser:
             return None
 
         raise SyntaxError(f"Unknown constructor '{constructor}', line {stmt.lineno}.")
-
-    def parse_call(self, call: ast.Call, line: int) -> Instruction:
-        if not isinstance(call.func, ast.Name):
-            raise SyntaxError("Expected function name.")
-
-        name = call.func.id
-
-        if name == "MoveJ":
-            if len(call.args) != 1:
-                raise SyntaxError("MoveJ expects one argument.")
-
-            arg = call.args[0]
-            if not isinstance(arg, ast.Name):
-                raise SyntaxError("MoveJ expects a target.")
-
-            return MoveJ(target=self.program.targets[arg.id], line=line)
-
-        raise SyntaxError(f"Unknown instruction '{name}'.")
-
-    def parse_condition(self, expr: ast.expr) -> Condition:
-
-        if not isinstance(expr, ast.Call):
-            raise SyntaxError("Expected function call.")
-
-        if not isinstance(expr.func, ast.Name):
-            raise SyntaxError("Expected function name.")
-
-        if expr.func.id != "DI":
-            raise SyntaxError("Unknown condition.")
-
-        if len(expr.args) != 1:
-            raise SyntaxError("DI expects one argument.")
-
-        arg = expr.args[0]
-
-        if not isinstance(arg, ast.Constant):
-            raise SyntaxError("Signal name must be a string.")
-
-        if not isinstance(arg.value, str):
-            raise SyntaxError("Signal name must be a string.")
-
-        return DigitalInputCondition(arg.value)
-
-    def parse_joint_target(self, name: str, call: ast.Call) -> Target:
-
-        values = []
-
-        for arg in call.args:
-
-            if not isinstance(arg, ast.Constant):
-                raise SyntaxError("JointTarget only accepts numeric constants.")
-
-            values.append(float(arg.value))
-
-        return Target(name=name, joints=np.array(values))

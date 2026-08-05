@@ -1,16 +1,15 @@
-from backend.robot_system import RobotSystem
+from PyQt6.QtCore import pyqtSignal, QObject
 from robot_program.program import Program
-from robot_program.target import Target
 from robot_program.instructions.motion import *
-from robot_program.instructions.flow import *
-from robot_program.condition import *
-from robot_program.instructions.timing import *
-import numpy as np
 
 
-class InstructionExecutor:
+class InstructionExecutor(QObject):
+
+    current_lineno = pyqtSignal(int)
 
     def __init__(self):
+
+        super().__init__()
 
         self.robot_sys = None
 
@@ -22,18 +21,21 @@ class InstructionExecutor:
 
         for instruction in program:
 
+            self.current_lineno.emit(instruction.line)
+
             if isinstance(instruction, MoveJ):
 
                 self.execute_move_joint(instruction)
 
-            elif isinstance(instruction, MoveL):
+            elif isinstance(instruction, MovePoseL):
 
                 self.execute_move_linear(instruction)
 
     def execute_move_joint(self, instruction: MoveJ):
         jnt_vec = instruction.target.joints
         speed = instruction.target.speed
+        print(type(jnt_vec))
         self.robot_sys.move_jnt(jnt_vec, speed)
 
-    def execute_move_linear(self, instruction: MoveL):
+    def execute_move_linear(self, instruction: MovePoseL):
         ...

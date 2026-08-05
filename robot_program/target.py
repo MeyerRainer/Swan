@@ -1,6 +1,7 @@
 from robot_math.pose import Pose
 
 from dataclasses import dataclass
+from typing import List, Dict, Optional, Any
 import numpy as np
 
 
@@ -13,8 +14,8 @@ class Target:
     """
 
     name: str = ""
-    pose: Pose | None = None      # Operational space
-    joints: np.ndarray | None = None  # Joint space
+    pose: Optional[Pose] = None      # Operational space
+    joints: Optional[np.ndarray] = None  # Joint space
 
     tool: str = "tool0"
     frame: str = "world"

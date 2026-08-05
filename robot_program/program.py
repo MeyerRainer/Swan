@@ -17,6 +17,10 @@ class Program:
         self.instructions.append(instruction)
 
     def insert(self, index: int, instruction: Instruction):
+        """ Insert new instruction to the list.
+        :param index: Index of new instruction.
+        :param instruction: Instruction to be added.
+        """
         self.instructions.insert(index, instruction)
 
     def remove(self, index: int):
@@ -24,9 +28,17 @@ class Program:
 
     def clear(self):
         self.instructions.clear()
+        self.targets.clear()
+        self.variables.clear()
 
     def __iter__(self):
         return iter(self.instructions)
 
     def __len__(self):
         return len(self.instructions)
+
+    # def __getitem__(self, item):
+    #     return self.instructions[item]
+    #
+    # def __setitem__(self, key, value):
+    #     self.instructions[key] = value

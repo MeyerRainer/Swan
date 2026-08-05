@@ -12,5 +12,10 @@ class MoveJ(Instruction):
 
 
 @dataclass
-class MoveL(Instruction):
+class MovePoseJ(Instruction):
+    target: Target
+
+
+@dataclass
+class MovePoseL(Instruction):
     target: Target
