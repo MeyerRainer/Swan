@@ -1,10 +1,10 @@
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QWidget
 
-from robot_program.executor import InstructionExecutor
-from robot_program.parser import ProgramParser
-from robot_program.program import Program
-from robot_program.writer import ProgramWriter
+from robot_program_delete.executor import InstructionExecutor
+from robot_program_delete.parser import ProgramParser
+from robot_program_delete.program import Program
+from robot_program_delete.writer import ProgramWriter
 
 
 class ProgramController(QWidget):

@@ -1,6 +1,6 @@
 from PyQt6.QtCore import pyqtSignal, QObject
-from robot_program.program import Program
-from robot_program.instructions.motion import *
+from robot_program_delete.program import Program
+from robot_program_delete.instructions.motion import *
 
 
 class InstructionExecutor(QObject):

@@ -245,7 +245,7 @@ class Gizmo:
         return HandleType.NONE
 
     def get_axis_vector(self, body_frame=True) -> QVector3D | None:
-        """ Return axis direction vector basen on current drag context """
+        """ Return axis direction vector basen on current drag current_context """
         mode = self.DC.mode
 
         match mode:
@@ -292,7 +292,7 @@ class Gizmo:
         return True
 
     def start_drag(self, ray_origin: QVector3D, ray_dir: QVector3D, camera_position: QVector3D, mode: HandleType, body_frame=True):
-        """ Start dragging event. Fill drag context. """
+        """ Start dragging event. Fill drag current_context. """
 
         self.DC.mode = mode
         self.DC.origin = QVector3D(self.target_object.get_position())
@@ -301,7 +301,7 @@ class Gizmo:
             self.DC.mode = HandleType.NONE
             return
 
-        # Update drag context
+        # Update drag current_context
         pose: Pose = self.target_object.pose
         self.DC.orientation = QQuaternion(*pose.quaternion.components)
 

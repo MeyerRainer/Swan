@@ -13,7 +13,7 @@ class Grid:
   def __init__(self, size=10, step=1, color=(0.3, 0.3, 0.3)):
     """ Initializes and uploads grid geometry to GPU memory.
 
-    Must be instantiated AFTER an active OpenGL context exists.
+    Must be instantiated AFTER an active OpenGL current_context exists.
     """
     self.size = size
     self.step = step

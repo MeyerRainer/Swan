@@ -1,7 +1,7 @@
 """ Program flow instructions """
 
-from robot_program.instructions.instruction import Instruction
-from robot_program.condition import *
+from robot_program_delete.instructions.instruction import Instruction
+from robot_program_delete.condition import *
 
 from dataclasses import dataclass, field
 

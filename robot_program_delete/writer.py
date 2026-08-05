@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from robot_program.program import Program
+from robot_program_delete.program import Program
 
 
 class ProgramWriter(ABC):

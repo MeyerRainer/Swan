@@ -1,9 +1,9 @@
-from robot_program.instructions.timing import WaitSeconds
-from robot_program.program import Program
-from robot_program.target import Target
-from robot_program.instructions.motion import *
-from robot_program.instructions.flow import *
-from robot_program.condition import *
+from robot_program_delete.instructions.timing import WaitSeconds
+from robot_program_delete.program import Program
+from robot_program_delete.target import Target
+from robot_program_delete.instructions.motion import *
+from robot_program_delete.instructions.flow import *
+from robot_program_delete.condition import *
 
 from typing import Any, Optional
 import ast

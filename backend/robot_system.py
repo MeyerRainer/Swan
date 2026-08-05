@@ -145,6 +145,7 @@ class RobotSystem(QObject):
         @:param time: Motion time in seconds
         @:param speed: Motion speed in rad/s
         """
+        print(f"move_jnt called with jnt_vec: {jnt_vec}")
         mot_vec_manipulator_rad = jnt_vec[:6]
         mot_vec_linear_axis_m = jnt_vec[6:7]
 

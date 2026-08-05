@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 import numpy as np
 
-from robot_program.condition import Condition
+from robot_program_delete.condition import Condition
 
 robot = application_context.robot_sys
 

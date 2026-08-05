@@ -9,6 +9,11 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QHBoxLayout, QGro
     QMessageBox, QPlainTextEdit, QLineEdit, QTextEdit, QLabel
 import os
 
+BUTTON_STYLE = ("""
+    QPushButton { background-color: #3498db; color: white; }
+    QPushButton:hover { background-color: #2980b9; }
+""")
+
 
 class ProgramEditor(QPlainTextEdit):
 
@@ -38,6 +43,12 @@ class ProgramEditor(QPlainTextEdit):
         # 4. Pass a list containing the selection to the widget
         self.setExtraSelections([extra_selection])
 
+# class CustomButton(QPushButton):
+#     def enterEvent(self, event):
+#         self.setStyleSheet("background-color: lightblue;")
+#     def leaveEvent(self, event):
+#         self.setStyleSheet("background-color: none;")
+
 
 class ProgramWidget(QWidget):
 
@@ -58,8 +69,12 @@ class ProgramWidget(QWidget):
         self.write_to_file_button = QPushButton("Write to file")
         self.upload_program_button = QPushButton("Upload")
         self.run_button = QPushButton("Run")
+        self.resume_button = QPushButton("Resume")
         self.pause_button = QPushButton("Pause")
         self.stop_button = QPushButton("Stop")
+        self.step_button = QPushButton("Step")
+
+        self.new_program_button.setToolTip("Create a new robot program")
 
         # Text box
         # self.text_box = QPlainTextEdit()
@@ -90,6 +105,8 @@ class ProgramWidget(QWidget):
         g_button_layout.addWidget(self.run_button, 1, 0)
         g_button_layout.addWidget(self.pause_button, 1, 1)
         g_button_layout.addWidget(self.stop_button, 1, 2)
+        g_button_layout.addWidget(self.step_button, 1, 3)
+        g_button_layout.addWidget(self.resume_button, 2, 0)
         layout_program_control.addLayout(g_button_layout)
 
         # Current file

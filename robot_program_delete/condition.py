@@ -2,7 +2,7 @@ from abc import ABC
 from dataclasses import dataclass, field
 from typing import Any, List
 
-from robot_program.instructions.instruction import Instruction
+from robot_program_delete.instructions.instruction import Instruction
 
 
 class Condition(ABC):

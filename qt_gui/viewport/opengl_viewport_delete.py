@@ -44,7 +44,7 @@ class OpenGLViewport(QOpenGLWidget):
 
     @override
     def initializeGL(self):
-        # OpenGL context
+        # OpenGL current_context
         GL.glEnable(GL.GL_DEPTH_TEST)
         GL.glClearColor(0.15, 0.15, 0.15, 1.0)
 

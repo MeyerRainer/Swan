@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass
 
-from robot_program.instructions.instruction import Instruction
-from robot_program.target import Target
+from robot_program_delete.instructions.instruction import Instruction
+from robot_program_delete.target import Target
 
 
 @dataclass

@@ -64,8 +64,8 @@ class SceneObject:
         ebo: int = GL.glGenBuffers(1)
 
 
-        # Binding a VAO activates it as the active context state. Any subsequent buffer bindings(GL_ELEMENT_ARRAY_BUFFER)
-        # and attribute pointers (glVertexAttribPointer) are stored directly inside this VAO context.
+        # Binding a VAO activates it as the active current_context state. Any subsequent buffer bindings(GL_ELEMENT_ARRAY_BUFFER)
+        # and attribute pointers (glVertexAttribPointer) are stored directly inside this VAO current_context.
         GL.glBindVertexArray(self.vao)
         # Copy Vertices to GPU Memory (glBufferData on VBO)
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, vbo)

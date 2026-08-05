@@ -23,7 +23,7 @@ class SceneRenderer:
         self.shader_program = None
 
     def initialize(self):
-        """ Called once when the OpenGL context is valid.
+        """ Called once when the OpenGL current_context is valid.
         """
         # Compile shaders, set up lighting parameters, depth tests
         GL.glEnable(GL.GL_DEPTH_TEST)
@@ -156,7 +156,7 @@ class SceneRenderer:
         }
 
     def cleanup(self):
-        """ Free GPU resources when context is destroyed.
+        """ Free GPU resources when current_context is destroyed.
         """
         for handles in self._gpu_cache.values():
             GL.glDeleteVertexArrays(1, [handles["vao"]])
