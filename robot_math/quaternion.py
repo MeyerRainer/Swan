@@ -228,6 +228,36 @@ class Quaternion:
         similarity = abs(np.clip(self.dot(other), -1, 1))
         return 2 * math.acos(similarity)
 
+    def rotation_direction(self, other: Quaternion) -> np.ndarray:
+        """Computes the unit rotation axis (direction) from self to other.
+            Returns np.zeros(3) if the angle is close to pi or zero.
+        """
+        # Relative rotation
+        q_rel = self.inverse() * other
+
+        # Extract scalar (w) and vector (x, y, z) components
+        w = q_rel.w
+        v = np.array([q_rel.x, q_rel.y, q_rel.z], dtype=float)
+
+        # Take the shortest rotation path (w >= 0)
+        if w < 0:
+            w = -w
+            v = -v
+
+        w = np.clip(w, -1.0, 1.0)
+        angle = 2.0 * np.arccos(w)
+
+        # Return zero array if angle is close to pi (or 0)
+        if np.isclose(angle, np.pi, atol=1e-4) or np.isclose(angle, 0.0, atol=1e-4):
+            return np.zeros(3)
+
+        # Compute normalized unit axis: u = v / sin(angle / 2)
+        sin_half = np.sqrt(1.0 - w * w)
+        if sin_half < 1e-8:
+            return np.zeros(3)
+
+        return v / sin_half
+
     # --- Spatial Operations ---
     def rotate_vector(self, vec: Tuple[float, float, float]) -> Tuple[float, float, float]:
         """ Rotates a 3D vector (x, y, z) using this quaternion: v' = q * v * q^-1.

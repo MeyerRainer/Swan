@@ -13,8 +13,8 @@ class Pose:
         self._position = position.copy()
         self._rot_mat = rotation_matrix.copy()
 
-    def __repr__(self):
-        return "Not implemented"
+    def __repr__(self) -> str:
+        return f"Pose: {self.SE3}"
 
     def __copy__(self):
         return Pose(self._position, self._rot_mat)
@@ -129,26 +129,36 @@ class Pose:
         self._rot_mat = utils.zyz2rot_mat(zyz)
 
     @SE3.setter
-    def SE3(self, T):
+    def SE3(self, T) -> None:
         if T.shape != (4, 4):
             raise ValueError(f"Expected shape (4, 4), got {T.shape} instead.")
         self.position = T[:3, 3]
         self.rot_mat = T[:3, :3]
 
-    def inverse(self):
+    def inverse(self) -> Pose:
         inv = Pose.identity()
         inv.rot_mat = self.rot_mat.T
         inv.position = inv.rot_mat @ self.position * -1
         return inv
 
-    def compose(self, other: Pose):
+    def compose(self, other: Pose) -> Pose:
         return Pose.from_SE3(self.SE3 @ other.SE3)
 
-    def relative_to(self, other: Pose):
+    def relative_to(self, other: Pose) -> Pose:
         return other.inverse().compose(self)
 
-    def distance(self, other: Pose):
+    def distance(self, other: Pose) -> float:
         return np.linalg.norm((self.position - other.position))
+
+    def translation_direction(self, other: Pose) -> np.ndarray:
+        dir_vec = other.position - self.position
+        norm = np.linalg.norm(dir_vec)
+        if norm > 1e-6:
+            return dir_vec / norm
+        return np.zeros(3)
+
+    def rotation_direction(self, other: Pose) -> np.ndarray:
+        return self.quaternion.rotation_direction(other.quaternion)
 
     def angle(self, other: Pose):
         return self.quaternion.angle(other.quaternion)
