@@ -5,8 +5,9 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 import config
 from config import *
+from robot_math.pose import Pose
 from robot_math.quaternion import Quaternion
-from backend.manipulator_state import *
+from backend.manipulator_state import ManipulatorState
 from backend.kinematics.anthropomorphic_spherical_wrist import ASWKinematics
 
 from math import sqrt, fabs
@@ -41,7 +42,7 @@ class Manipulator:
 
         self.kinematics = ASWKinematics(DH=config.DH_PARAMS)
 
-        self.state = State(self.kinematics)
+        self.state = ManipulatorState(self.kinematics)
 
     # TODO: Move to state?
     def _compute_condition(self, frame: np.ndarray) -> np.ndarray:

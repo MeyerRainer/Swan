@@ -2,8 +2,9 @@
 Wrapper class for Manipulator
 Author: Rainer Meyer, rot.meyer494@gmail.com
 """
+from typing import Tuple
 
-from backend.manipulator import Manipulator
+from backend.manipulator import Manipulator, IK_SOLUTION
 from backend.linear_axis import LinearAxis
 from backend.g_code_writer import GCodeWriter
 from robot_math.pose import Pose
@@ -39,7 +40,7 @@ class RobotSystem(QObject):
     #     @param pose: Desired end posture
     #     @param criteria: Additional criteria for specific joint solution
     #     """
-    #     current_pose: Pose = self._sys_pose.copy()
+    #     current_pose: Pose = self.get_queue_motor().copy()
     #     # TODO: Quat error in caller function
     #     # quat_err = utils.quat_multiply(quat_desired, quat_current.inv)
     #     # Quaternion error to rotation vector (for small errors only)

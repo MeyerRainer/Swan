@@ -12,7 +12,7 @@ import numpy as np
 
 
 @dataclass
-class ManipulatorState:
+class ManipulatorStateObject:
 
     def __init__(self, kinematics):
 
@@ -73,10 +73,10 @@ class ManipulatorState:
 
 
 @dataclass
-class State:
+class ManipulatorState:
 
     def __init__(self, kinematics):
 
-        self.mcu = ManipulatorState(kinematics)      # Actual machine state based on MCU report
-        self.queued = ManipulatorState(kinematics)   # State based on motion commands queued one the MCU
-        self.planner = ManipulatorState(kinematics)  # State based on planner buffer
+        self.mcu = ManipulatorStateObject(kinematics)      # Actual machine state based on MCU report
+        self.queued = ManipulatorStateObject(kinematics)   # State based on motion commands queued one the MCU
+        self.planner = ManipulatorStateObject(kinematics)  # State based on planner buffer
