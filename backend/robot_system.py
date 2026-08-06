@@ -62,31 +62,8 @@ class RobotSystem(QObject):
         sys_queue_motor = np.zeros(8)
         sys_queue_motor[:6] = np.rad2deg(self._manipulator.state.queued.motor_state)
         sys_queue_motor[6:7] = 1000. * self._linear_axis.state.queued.joint_state
+
         return sys_queue_motor
-
-    def write_g_code(self, mot_vec: np.ndarray, feedrate: float) -> bool:
-        """ Generates a G-code with units of deg, mm and minutes and emits it to g_code_generated signal
-        @:param mot_vec: 8-vector of motor absolute coordinates in controller distance units (deg for angular, mm for linear)
-        @:param feedrate: Feedrate. deg/min and mm/min
-        @:return: True if generation of motion successful
-        """
-
-        # Write G-code for motor motion
-        g_code = self.gc_writer.move_linear(
-            x=float(mot_vec[0]),
-            y=float(mot_vec[1]),
-            z=float(mot_vec[2]),
-            a=float(mot_vec[3]),
-            b=float(mot_vec[4]),
-            c=float(mot_vec[5]),
-            u=float(mot_vec[6]),
-            v=float(mot_vec[7]),
-            feedrate=feedrate)
-
-        self.g_code_generated.emit(g_code)
-        # print(f"write_g_code: {g_code}")
-
-        return True
 
     def sys_motor_move(self, mot_vec_manipulator: np.ndarray | None = None, mot_vec_linear_axis: np.ndarray | None = None,
                        time: float | None = None, speed: float | None = None, incremental=False) -> bool:
@@ -98,10 +75,10 @@ class RobotSystem(QObject):
         @:param speed: Motion speed in rad/s
         @:return: True if move sent to queue
         """
-        sys_mot_vec_current: np.ndarray = self.get_queue_motor()  # Current queued motor position vector. Degrees and millimeters.
+        sys_mot_vec_queued: np.ndarray = self.get_queue_motor()  # Current queued motor position vector. Degrees and millimeters.
 
         # Construct absolute target vector
-        sys_mot_vec_target = sys_mot_vec_current.copy()
+        sys_mot_vec_target = sys_mot_vec_queued.copy()
         if incremental:  # Add
             if mot_vec_manipulator is not None:
                 sys_mot_vec_target[:6] += np.rad2deg(mot_vec_manipulator[:6].copy())
@@ -115,7 +92,7 @@ class RobotSystem(QObject):
                 sys_mot_vec_target[6:7] = 1000 * mot_vec_linear_axis.copy()  # Target position in millimeters
 
         # Normalized direction vector
-        delta_mot_vec = sys_mot_vec_target - sys_mot_vec_current
+        delta_mot_vec = sys_mot_vec_target - sys_mot_vec_queued
         delta_mot_vec_norm = LA.norm(delta_mot_vec)
         dir_vec = delta_mot_vec / delta_mot_vec_norm
 
@@ -137,7 +114,16 @@ class RobotSystem(QObject):
         # Set queued state
         self._manipulator.state.queued.motor_state = np.deg2rad(sys_mot_vec_target[:6])
 
-        return self.write_g_code(sys_mot_vec_target, feedrate)
+        # Write G-code for motor motion and send to serial queue.
+        g_code = self.gc_writer.move_linear(x=float(sys_mot_vec_target[0]), y=float(sys_mot_vec_target[1]),
+                                            z=float(sys_mot_vec_target[2]), a=float(sys_mot_vec_target[3]),
+                                            b=float(sys_mot_vec_target[4]), c=float(sys_mot_vec_target[5]),
+                                            u=float(sys_mot_vec_target[6]), v=float(sys_mot_vec_target[7]),
+                                            feedrate=feedrate)
+        self.g_code_generated.emit(g_code)
+        # print(f"write_g_code: {g_code}")
+
+        return True
 
     def move_jnt(self, jnt_vec: np.ndarray, time: float | None = None, speed: float | None = None, degrees: bool = False) -> bool:
         """ Move 8-joint

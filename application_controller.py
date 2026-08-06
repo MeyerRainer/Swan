@@ -93,17 +93,15 @@ class ApplicationController(QObject):
         # GUI -> Context
         self.main_window.program_panel.directory_changed.connect(self.main_window.save_last_directory)
         self.main_window.program_panel.write_terminal.connect(self.main_window.terminal.write)
-        # self.main_window.program_panel.run_button.clicked.connect(self.app_context.program_controller.execute_program)
-        # self.main_window.program_panel.sgn_open_file.connect(self.app_context.program_controller.load_program)
         self.main_window.program_panel.sgn_open_file.connect(self.app_context.program_manager.load_program)
-        self.main_window.program_panel.run_button.clicked.connect(self.app_context.program_manager.execute_program)
-        self.main_window.program_panel.pause_button.clicked.connect(self.app_context.program_manager.controller.pause)
-        self.main_window.program_panel.resume_button.clicked.connect(self.app_context.program_manager.controller.resume)
-        self.main_window.program_panel.step_button.clicked.connect(self.app_context.program_manager.controller.step)
-        self.main_window.program_panel.stop_button.clicked.connect(self.app_context.program_manager.controller.stop)
+        self.main_window.program_panel.run_button.clicked.connect(self.app_context.program_manager.on_run)
+        self.main_window.program_panel.pause_button.clicked.connect(self.app_context.program_manager.on_pause)
+        self.main_window.program_panel.resume_button.clicked.connect(self.app_context.program_manager.on_resume)
+        self.main_window.program_panel.step_button.clicked.connect(self.app_context.program_manager.on_step)
+        self.main_window.program_panel.stop_button.clicked.connect(self.app_context.program_manager.on_stop)
         # Context -> GUI
-        # self.app_context.program_controller.executor.current_lineno.connect(self.main_window.program_panel.on_lineno_change)
-        # self.app_context.program_controller.sgn_program_loaded.connect(self.main_window.program_panel.on_file_load)
+        self.app_context.program_manager.sgn_current_program_line.connect(self.main_window.program_panel.on_lineno_change)
+        self.app_context.program_manager.sgn_program_loaded.connect(self.main_window.program_panel.on_file_load)
         self.app_context.program_manager.sgn_write_terminal.connect(self.main_window.terminal.write)
 
         # ========================================= Scene panel ==========================================
