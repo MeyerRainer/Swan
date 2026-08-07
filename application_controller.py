@@ -29,10 +29,13 @@ class ApplicationController(QObject):
     def connect_signals(self):
 
         # =========================================== Toolbar ============================================
+        # GUI -> Context
         self.main_window.toolbar.refresh_button.clicked.connect(self.app_context.serial.refresh_ports)
         self.main_window.toolbar.connect_button.clicked.connect(self.app_context.serial.toggle_connection)
         self.main_window.toolbar.baud_combo.currentTextChanged.connect(self.app_context.serial.on_baud_receive)
         self.main_window.toolbar.port_combo.currentTextChanged.connect(self.app_context.serial.on_port_receive)
+        self.main_window.toolbar.hold_resume_button.clicked.connect(self.app_context.robot_sys.toggle_feed_hold)
+        # Context -> GUI
 
         # ======================================== Control panel =========================================
         self.main_window.control_panel.home_button.clicked.connect(self.home)
@@ -69,14 +72,14 @@ class ApplicationController(QObject):
         self.app_context.robot_sys.send_terminal.connect(self.main_window.terminal.write)
 
         # =========================================== Serial =============================================
+        # GUI -> Context
+        # Context -> GUI
         self.app_context.serial.connected.connect(self.main_window.toolbar.on_connect)
         self.app_context.serial.disconnected.connect(self.main_window.toolbar.on_disconnect)
         self.app_context.serial.serial_connect.connect(self.main_window.toolbar.on_serial_toggle)
-        self.app_context.serial.write_terminal.connect(self.main_window.terminal.write)
         self.app_context.serial.ports_refreshed.connect(self.main_window.toolbar.display_ports)
+        self.app_context.serial.write_terminal.connect(self.main_window.terminal.write)
         self.app_context.serial.status_received.connect(self.on_status_update)
-        # self.serial.error_received.connect(self.terminal.write)
-        # self.serial.alarm_received.connect(self.terminal.write)
 
         # =========================================== Terminal ===========================================
         # self.terminal_panel.command_signal.connect(self.serial.send)  # Send to serial. First parse message.
@@ -85,6 +88,8 @@ class ApplicationController(QObject):
         self.main_window.viewport_tabs.currentChanged.connect(self.on_viewport_tab_change)
 
         # =========================================== Camera =============================================
+        # GUI -> Context
+        # Context -> GUI
         self.app_context.camera.frame_received.connect(self.main_window.view_camera.show_frame)
         self.app_context.camera.error.connect(self.main_window.terminal.write)
         self.app_context.vision.processed_frame.connect(self.main_window.view_camera.show_frame)
@@ -95,8 +100,7 @@ class ApplicationController(QObject):
         self.main_window.program_panel.write_terminal.connect(self.main_window.terminal.write)
         self.main_window.program_panel.sgn_open_file.connect(self.app_context.program_manager.load_program)
         self.main_window.program_panel.run_button.clicked.connect(self.app_context.program_manager.on_run)
-        self.main_window.program_panel.pause_button.clicked.connect(self.app_context.program_manager.on_pause)
-        self.main_window.program_panel.resume_button.clicked.connect(self.app_context.program_manager.on_resume)
+        self.main_window.program_panel.pause_resume_button.clicked.connect(self.app_context.program_manager.on_pause_resume_toggle)
         self.main_window.program_panel.step_button.clicked.connect(self.app_context.program_manager.on_step)
         self.main_window.program_panel.stop_button.clicked.connect(self.app_context.program_manager.on_stop)
         # Context -> GUI
@@ -154,23 +158,14 @@ class ApplicationController(QObject):
         """ Upon receiving status from GRBL, update complete system status
         @param grbl_status_str: str, GRBL-styled status message
         """
+        # TODO: Add time stamp to GRBL realtime report.
         time_s: float = time.monotonic()
         delta_t = time_s - self._time_s
         self._time_s = time_s
 
-        # Update robot state
+        # Parse MCU status.
         status, m_pos, w_pos = utils.parse_grbl_status(grbl_status_str)
-        self.main_window.toolbar.update_status(status)
 
-        # TODO: Simplify to: main_window.update_status() and app_context.update_status()?
-        # Update manipulator state
-        status_dict: dict = self.app_context.robot_sys.update_status(m_pos, delta_t)
-
-        # Update digital readout
-        self.main_window.dro_panel.update_status(status_dict)
-
-        # Update viewport
-        self.main_window.view_3d.update_status(status_dict)
-
-        # Update sliders
-        self.main_window.control_panel.update_joint_sliders(status_dict['jnt_coords_deg'])
+        # Update app context and main window.
+        status_dict: dict = self.app_context.update_status(status, m_pos, delta_t)
+        self.main_window.update_status(status_dict)

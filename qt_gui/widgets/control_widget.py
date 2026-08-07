@@ -47,8 +47,10 @@ class ControlWidget(QWidget):
         self.home_button = QPushButton("Home")
         self.enable_button = QPushButton("Enable")
 
-        self.radio_button_jnt = QRadioButton("Joint space")
-        self.radio_button_ops = QRadioButton("Operational space")
+        self.radio_button_jnt = QRadioButton("Joint")
+        self.radio_button_ops = QRadioButton("Cartesian")
+        self.radio_button_giz = QRadioButton("Gizmo")
+        self.radio_button_prog = QRadioButton("Program")
         self.radio_button_ops.setChecked(True)  # OPS-control by default
 
         self.frame_select_position = QComboBox()
@@ -108,7 +110,7 @@ class ControlWidget(QWidget):
         self.speed_angular = CustomSlider("Angular (deg/min)", ANGULAR_SPEED_MIN, ANGULAR_SPEED_MAX, ANGULAR_SPEED_DEFAULT)
         self.speed_joint = CustomSlider("Joint (deg/min) ", JOINT_SPEED_MIN, JOINT_SPEED_MAX, JOINT_SPEED_DEFAULT)
 
-        self.switch_ops_control(True)
+        self.switch_ops_mode(True)
         self.init_ui()
 
     @property
@@ -119,24 +121,35 @@ class ControlWidget(QWidget):
 
         layout = QVBoxLayout()
 
-        # Motion
+        # ======================================= Control Mode =======================================
         motion_group = QGroupBox("Motion")
-        motion_layout = QGridLayout()
+        v_motion_layout = QVBoxLayout()
 
-        self.radio_button_jnt.toggled.connect(self.switch_jnt_mode)
-        self.radio_button_ops.toggled.connect(self.switch_ops_control)
+        h_option_layout = QHBoxLayout()
+        h_option_layout.addWidget(self.home_button)
+        h_option_layout.addWidget(self.enable_button)
 
-        motion_layout.addWidget(self.home_button,0,0)
-        motion_layout.addWidget(self.enable_button,0,1)
-        motion_layout.addWidget(self.radio_button_jnt, 2, 0)
-        motion_layout.addWidget(self.radio_button_ops, 2, 1)
+        v_motion_layout.addLayout(h_option_layout)
 
-        motion_group.setLayout(motion_layout)
+        self.radio_button_jnt.toggled.connect(self.switch_joint_mode)
+        self.radio_button_ops.toggled.connect(self.switch_ops_mode)
+        self.radio_button_giz.toggled.connect(self.switch_gizmo_mode)
+        self.radio_button_prog.toggled.connect(self.switch_program_mode)
+        h_layout_control_mode = QHBoxLayout()
+        h_layout_control_mode.addWidget(self.radio_button_jnt)
+        h_layout_control_mode.addWidget(self.radio_button_ops)
+        h_layout_control_mode.addWidget(self.radio_button_giz)
+        h_layout_control_mode.addWidget(self.radio_button_prog)
+
+        v_motion_layout.addLayout(h_layout_control_mode)
+
+        motion_group.setLayout(v_motion_layout)
 
         # ======================================= OPS Control ========================================
         h_layout_ops = QHBoxLayout()
 
         # Position
+        v_layout_position = QVBoxLayout()
         g_layout_position = QGridLayout()
 
         g_layout_position.addWidget(self.x_plus, 1, 2)
@@ -151,13 +164,17 @@ class ControlWidget(QWidget):
         g_layout_position.addWidget(self.x_minus_y_plus, 0, 0)
         g_layout_position.addWidget(self.pos_mid, 1, 1)
 
-        self.increment_linear.setValue(LINEAR_INCREMENT)
-        g_layout_position.addWidget(QLabel("Increment"), 4, 0)
-        g_layout_position.addWidget(self.increment_linear, 4, 2)
-        g_layout_position.addWidget(QLabel("Frame"), 5, 0)
-        g_layout_position.addWidget(self.frame_select_position, 5, 2)
+        v_layout_position.addLayout(g_layout_position)
 
-        self.group_position.setLayout(g_layout_position)
+        self.increment_linear.setValue(LINEAR_INCREMENT)
+        g_layout_increment = QGridLayout()
+        g_layout_increment.addWidget(QLabel("Increment (mm)"), 0, 0)
+        g_layout_increment.addWidget(self.increment_linear, 0, 1)
+        g_layout_increment.addWidget(QLabel("Frame"), 1, 0)
+        g_layout_increment.addWidget(self.frame_select_position, 1, 1)
+        v_layout_position.addLayout(g_layout_increment)
+
+        self.group_position.setLayout(v_layout_position)
 
         # Orientation
         g_layout_orientation = QGridLayout()
@@ -169,6 +186,7 @@ class ControlWidget(QWidget):
         g_layout_orientation.addWidget(self.rz_minus, 2, 0)
         g_layout_orientation.addWidget(self.rz_plus, 2, 1)
 
+        # Increments
         self.increment_angular.setValue(ANGULAR_INCREMENT)
         g_layout_orientation.addWidget(QLabel("Increment"), 3, 0)
         g_layout_orientation.addWidget(self.increment_angular, 3, 1)
@@ -180,21 +198,6 @@ class ControlWidget(QWidget):
         h_layout_ops.addWidget(self.group_position)
 
         # ======================================= Joint control =======================================
-        group_increment = QGroupBox()
-        g_layout_increment = QGridLayout()
-        # Increment Scroll
-        self.increment_joint_scroll.setValue(JOINT_INCREMENT_SCROLL)
-        g_layout_increment.addWidget(QLabel("Scroll increment"), 0, 0)
-        g_layout_increment.addWidget(self.increment_joint_scroll, 0, 1)
-        self.increment_joint_scroll.valueChanged.connect(self.update_slider_increments)
-        # Increment Arrow key
-        self.increment_joint_arrow_key.setValue(JOINT_INCREMENT_ARROW_KEY)
-        g_layout_increment.addWidget(QLabel("Arrow key increment"), 1, 0)
-        g_layout_increment.addWidget(self.increment_joint_arrow_key, 1, 1)
-        group_increment.setLayout(g_layout_increment)
-        self.increment_joint_arrow_key.valueChanged.connect(self.update_slider_increments)
-
-        # Sliders
         v_layout_joint = QVBoxLayout()
 
         v_layout_joint.addWidget(self.j1_slider)
@@ -242,6 +245,21 @@ class ControlWidget(QWidget):
 
         self.group_nullspace.setLayout(v_layout_nullspace)
 
+        # ========================================= Increment =========================================
+        group_increment = QGroupBox("Joint Increment")
+        g_layout_increment = QHBoxLayout()
+        # Increment Scroll
+        self.increment_joint_scroll.setValue(JOINT_INCREMENT_SCROLL)
+        g_layout_increment.addWidget(QLabel("Scroll"))
+        g_layout_increment.addWidget(self.increment_joint_scroll)
+        self.increment_joint_scroll.valueChanged.connect(self.update_slider_increments)
+        # Increment Arrow key
+        self.increment_joint_arrow_key.setValue(JOINT_INCREMENT_ARROW_KEY)
+        g_layout_increment.addWidget(QLabel("Arrow key"))
+        g_layout_increment.addWidget(self.increment_joint_arrow_key)
+        group_increment.setLayout(g_layout_increment)
+        self.increment_joint_arrow_key.valueChanged.connect(self.update_slider_increments)
+
         # ======================================== Speeds =========================================
         group_speed = QGroupBox("Speed")
         v_layout_speed = QVBoxLayout()
@@ -262,14 +280,18 @@ class ControlWidget(QWidget):
         layout.addLayout(h_layout_ops)
         layout.addWidget(self.group_joint)
         layout.addWidget(self.group_joint_lin)
-        layout.addWidget(group_increment)
         layout.addWidget(self.group_nullspace)
+        layout.addWidget(group_increment)
         layout.addWidget(group_speed)
         layout.addStretch()
 
         self.setLayout(layout)
 
-    def update_joint_sliders(self, jnt_list: list):
+    def update_status(self, status_dict: dict):
+        joint_values_deg = status_dict['jnt_coords_deg']
+        self.update_joint_sliders(joint_values_deg)
+
+    def update_joint_sliders(self, jnt_list: np.ndarray):
         """ Update joint sliders if robot has moved
         @param jnt_list: List of joint values
         """
@@ -292,28 +314,54 @@ class ControlWidget(QWidget):
 
     def update_slider_increments(self):
         """ Update scrolling and arrow key increments on the sliders """
-        self.jl1_slider.set_steps(int(self.increment_joint_arrow_key.text()), int(self.increment_joint_scroll.text()))
+        self.j1_slider.set_steps(int(self.increment_joint_arrow_key.text()), int(self.increment_joint_scroll.text()))
+        self.j2_slider.set_steps(int(self.increment_joint_arrow_key.text()), int(self.increment_joint_scroll.text()))
+        self.j3_slider.set_steps(int(self.increment_joint_arrow_key.text()), int(self.increment_joint_scroll.text()))
+        self.j4_slider.set_steps(int(self.increment_joint_arrow_key.text()), int(self.increment_joint_scroll.text()))
+        self.j5_slider.set_steps(int(self.increment_joint_arrow_key.text()), int(self.increment_joint_scroll.text()))
+        self.j6_slider.set_steps(int(self.increment_joint_arrow_key.text()), int(self.increment_joint_scroll.text()))
+        self.j7_slider.set_steps(int(self.increment_joint_arrow_key.text()), int(self.increment_joint_scroll.text()))
 
-    def switch_jnt_mode(self, checked):
-        # Enable joint sliders
-        if checked:
-            # Disable feedback
+        self.jl1_slider.set_steps(int(self.increment_joint_arrow_key.text()), int(self.increment_joint_scroll.text()))
+        self.jl2_slider.set_steps(int(self.increment_joint_arrow_key.text()), int(self.increment_joint_scroll.text()))
+
+
+    def joint_panel_active(self, on: bool) -> None:
+        if on:
             self.cut_joint_slider_feedback()
-            # Enable joint panel
             self.group_joint.setEnabled(True)
             self.group_joint_lin.setEnabled(True)
             self.group_nullspace.setEnabled(True)
-            # Disable operational space panel
-            self.group_position.setEnabled(False)
-            self.group_orientation.setEnabled(False)
-
-    def switch_ops_control(self, checked: bool):
-        if checked:
+        else:
             self.regain_joint_slider_feedback()
-            # Disable joint panel
             self.group_joint.setEnabled(False)
             self.group_joint_lin.setEnabled(False)
             self.group_nullspace.setEnabled(False)
-            # Enable operational space panel
+
+    def ops_panel_active(self, on: bool) -> None:
+        if on:
             self.group_position.setEnabled(True)
             self.group_orientation.setEnabled(True)
+        else:
+            self.group_position.setEnabled(False)
+            self.group_orientation.setEnabled(False)
+
+    def switch_joint_mode(self, checked):
+        if checked:
+            self.joint_panel_active(True)
+            self.ops_panel_active(False)
+
+    def switch_ops_mode(self, checked: bool):
+        if checked:
+            self.joint_panel_active(False)
+            self.ops_panel_active(True)
+
+    def switch_gizmo_mode(self, checked: bool) -> None:
+        if checked:
+            self.joint_panel_active(False)
+            self.ops_panel_active(False)
+
+    def switch_program_mode(self, checked: bool) -> None:
+        if checked:
+            self.joint_panel_active(False)
+            self.ops_panel_active(False)

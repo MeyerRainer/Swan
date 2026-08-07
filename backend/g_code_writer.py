@@ -40,9 +40,36 @@ class GCodeWriter:
     def write_raw(self, gcode: str):
         self.write_line(gcode)
 
-    def move_linear(self, x=None, y=None, z=None, a=None, b=None, c=None, u=None, v=None, feedrate=None) -> str:
+    @staticmethod
+    def view_settings():
+        return "$$"
+
+    @staticmethod
+    def change_setting(setting: int, value: float):
+        if type(setting) is not int or type(value) is not float:
+            # TODO: Value ranges
+            return ""
+        return f"${setting}={value}"
+
+    @staticmethod
+    def view_parameters():
+        return "$#"
+
+    @staticmethod
+    def home():
+        return "$H"
+
+    @staticmethod
+    def cycle_start():
+        return "~"
+
+    @staticmethod
+    def feed_hold():
+        return "!"
+
+    def move(self, x=None, y=None, z=None, a=None, b=None, c=None, u=None, v=None, feedrate=None, rapid=False) -> str:
         """Write a linear move (G1) command with optional coordinates and feedrate."""
-        parts = ["G1"]
+        parts = ["G0"] if rapid else ["G1"]
         if x is not None:
             parts.append(f"X{x:.{self.decimals}f}")
         if y is not None:
@@ -60,7 +87,7 @@ class GCodeWriter:
         if v is not None:
             parts.append(f"V{v:.{self.decimals}f}")
 
-        if feedrate is not None:
+        if feedrate is not None and not rapid:
             parts.append(f"F{int(math.ceil(feedrate))}")
 
         return "".join(parts)
@@ -75,3 +102,7 @@ class GCodeWriter:
         if z is not None:
             parts.append(f"Z{z:.{self.decimals}f}")
         return " ".join(parts)
+
+    def dwell(self, seconds: float | int):
+        sec =  float(seconds)
+        return f"Z{sec:.{self.decimals}f}"

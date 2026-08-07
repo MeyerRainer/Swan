@@ -16,14 +16,13 @@ class GCSerial(QObject):
 
     connected = pyqtSignal(int, str)  # Baud, port
     disconnected = pyqtSignal()
-
-    ports_refreshed = pyqtSignal(list)
-    line_received = pyqtSignal(str)
-    status_received = pyqtSignal(str)
-    error_received = pyqtSignal(str)
-    alarm_received = pyqtSignal(str)
-    write_terminal = pyqtSignal(str)
     serial_connect = pyqtSignal(bool)
+    ports_refreshed = pyqtSignal(list)
+    write_terminal = pyqtSignal(str)
+    status_received = pyqtSignal(str)
+    # error_received = pyqtSignal(str)
+    # alarm_received = pyqtSignal(str)
+    # line_received = pyqtSignal(str)
 
     def __init__(self):
 
@@ -208,16 +207,13 @@ class GCSerial(QObject):
 
     def _process_line(self, line):
 
-        # Emit full line. Not needed currently.
-        # self.line_received.emit(line)
-
         if line.startswith('ok'):
             self._ack()
             return
 
         if line.startswith('error'):
             self._ack()
-            self.error_received.emit(line)
+            # self.error_received.emit(line)
             return
 
         if line.startswith('<'):
@@ -225,7 +221,8 @@ class GCSerial(QObject):
             return
 
         if line.startswith("ALARM"):
-            self.alarm_received.emit(line)
+            # self.alarm_received.emit(line)
+            return
 
     def _ack(self):
         with self._state_cv:

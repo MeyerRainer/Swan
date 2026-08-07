@@ -77,6 +77,7 @@ class MainWindow(QMainWindow):
 
     def create_menu(self):
         menubar = self.menuBar()
+        #menubar.setNativeMenuBar(True)  # MachOS
 
         # Menus
         file_menu = menubar.addMenu("File")
@@ -149,3 +150,9 @@ class MainWindow(QMainWindow):
         """ Automatically saves layout right before application exit."""
         self.save_current_layout()
         event.accept()
+
+    def update_status(self, status_dict: dict):
+        self.toolbar.update_status(status_dict)
+        self.dro_panel.update_status(status_dict)
+        self.view_3d.update_status(status_dict)
+        self.control_panel.update_status(status_dict)

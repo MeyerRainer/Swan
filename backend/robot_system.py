@@ -1,15 +1,16 @@
-"""
-Wrapper class for Manipulator
+""" Wrapper class for Manipulator
+
 Author: Rainer Meyer, rot.meyer494@gmail.com
 """
-from typing import Tuple
-
 from backend.manipulator import Manipulator, IK_SOLUTION
 from backend.linear_axis import LinearAxis
 from backend.g_code_writer import GCodeWriter
+from backend.system_state import SystemState, ControllerState
 from robot_math.pose import Pose
 from config import *
 import utils
+
+from typing import Tuple
 import numpy as np
 import numpy.linalg as LA
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -33,38 +34,69 @@ class RobotSystem(QObject):
         self.speed_linear_prev = 0.
         self.speed_angular_prev = 0.
 
-        # self.sys_state: SystemState = SystemState(self._manipulator.state, self._linear_axis.state)
+        self.sys_state: SystemState = SystemState(self._manipulator.state, self._linear_axis.state)
 
-    # def i_kin_7d(self, end_pose: Pose, quat_err: np.ndarray, criteria) -> Tuple[np.ndarray | None, IK_SOLUTION]:
-    #     """ Numerical inverse kinematics to solve 7 joints for given pose and an additional criteria
-    #     @param pose: Desired end posture
-    #     @param criteria: Additional criteria for specific joint solution
-    #     """
-    #     current_pose: Pose = self.get_queue_motor().copy()
-    #     # TODO: Quat error in caller function
-    #     # quat_err = utils.quat_multiply(quat_desired, quat_current.inv)
-    #     # Quaternion error to rotation vector (for small errors only)
-    #     rot_vec = 2 * quat_err[1:]  # Small angle approximation
-    #     delta_x = np.hstack((pos_err, rot_vec)).T
-    #
-    #     converge = False
-    #     iters = 0
-    #     while not converge and iters > 200:
-    #         # Error
-    #         pos_err: np.ndarray = end_pose.position - current_pose.position
-    #         rot_err: np.ndarray = end
-    #         # Fetch jacobian and do pseudo inverse
-    #         J = self._sys_jacobian.copy()
-    #         J_pinv = LA.pinv(J)
-    #         delta_q = J_pinv @ delta_x
+    def move_lin_7d(self, end_pose: Pose, stepping_rate: float = 1e-4) -> bool:
+        """ Numerical inverse kinematics to solve 7 joints for given pose and an additional criteria
+        @param pose: Desired end posture
+        @param criteria: Additional criteria for specific joint solution
+        """
 
-    def get_queue_motor(self):
-        """ Get motor coordinates currently queued for motion. Degrees and millimeters. """
-        sys_queue_motor = np.zeros(8)
-        sys_queue_motor[:6] = np.rad2deg(self._manipulator.state.queued.motor_state)
-        sys_queue_motor[6:7] = 1000. * self._linear_axis.state.queued.joint_state
+        # pos_error: float  = current_pose.distance(end_pose)
+        # ang_error: float = current_pose.quaternion.angle(end_pose.quaternion)
 
-        return sys_queue_motor
+        converge = False
+        iters = 0
+        while not converge and iters < 1000:
+            current_pose: Pose = self.sys_state.queued_pose
+            if current_pose.distance(end_pose) < 0.001:  # 1mm
+                return True
+            trans_dir: np.ndarray = current_pose.translation_direction(end_pose)
+            rot_dir: np.ndarray = current_pose.rotation_direction(end_pose)
+            dx: np.ndarray = stepping_rate * np.hstack((trans_dir, rot_dir)).T  # 6-vector
+
+            # Fetch jacobian and do pseudo inverse
+            J = self.sys_state.queued_jacobian
+            J_pinv = LA.pinv(J)
+            dq = J_pinv @ dx
+            jnt_vec = self.sys_state.queue_motors
+            jnt_vec[:7] += dq
+            self.sys_motor_move(jnt_vec)
+            iters += 1
+
+        return True
+
+    def move_null(self, null_vec: np.ndarray, criteria) -> bool:
+        ...
+
+
+
+        # quat_err = utils.quat_multiply(quat_desired, quat_current.inv)
+        # Quaternion error to rotation vector (for small errors only)
+        # rot_vec = 2 * quat_err[1:]  # Small angle approximation
+        # delta_x = np.hstack((pos_err, rot_vec)).T
+
+        # current_pose: Pose = self.sys_state.queued_pose
+        # if current_pose.distance(end_pose) > 0.010:
+        #     return False
+        #
+        # max_iters = 200
+        # iteration = 0
+        # temp_jnt_vec = np.zeros(8)
+        # while iteration < max_iters:
+        #     # Unit directions of motion.
+        #     trans_dir: np.ndarray = current_pose.translation_direction(end_pose)
+        #     rot_dir: np.ndarray = current_pose.rotation_direction(end_pose)
+        #
+        #     # Fetch jacobian and do pseudo inverse
+        #     J = self.sys_state.queued_jacobian
+        #     if LA.det(J) < 0.001:
+        #         return False
+        #     J_pinv = LA.pinv(J)
+        #     delta_q = J_pinv @ delta_x
+        #     iters += 1
+        #
+        # return True
 
     def sys_motor_move(self, mot_vec_manipulator: np.ndarray | None = None, mot_vec_linear_axis: np.ndarray | None = None,
                        time: float | None = None, speed: float | None = None, incremental=False) -> bool:
@@ -76,7 +108,8 @@ class RobotSystem(QObject):
         @:param speed: Motion speed in rad/s
         @:return: True if move sent to queue
         """
-        sys_mot_vec_queued: np.ndarray = self.get_queue_motor()  # Current queued motor position vector. Degrees and millimeters.
+        # sys_mot_vec_queued: np.ndarray = self.get_queue_motor()  # Current queued motor position vector. Degrees and millimeters.
+        sys_mot_vec_queued: np.ndarray = self.sys_state.queue_motors  # Current queued motor position vector. Degrees and millimeters.
 
         # Construct absolute target vector
         sys_mot_vec_target = sys_mot_vec_queued.copy()
@@ -116,11 +149,11 @@ class RobotSystem(QObject):
         self._manipulator.state.queued.motor_state = np.deg2rad(sys_mot_vec_target[:6])
 
         # Write G-code for motor motion and send to serial queue.
-        g_code = self.gc_writer.move_linear(x=float(sys_mot_vec_target[0]), y=float(sys_mot_vec_target[1]),
+        g_code = self.gc_writer.move(x=float(sys_mot_vec_target[0]), y=float(sys_mot_vec_target[1]),
                                             z=float(sys_mot_vec_target[2]), a=float(sys_mot_vec_target[3]),
                                             b=float(sys_mot_vec_target[4]), c=float(sys_mot_vec_target[5]),
                                             u=float(sys_mot_vec_target[6]), v=float(sys_mot_vec_target[7]),
-                                            feedrate=feedrate)
+                                            feedrate=feedrate, rapid=False)
         self.g_code_generated.emit(g_code)
         # print(f"write_g_code: {g_code}")
 
@@ -132,7 +165,6 @@ class RobotSystem(QObject):
         @:param time: Motion time in seconds
         @:param speed: Motion speed in rad/s
         """
-        print(f"move_jnt called with jnt_vec: {jnt_vec}")
         mot_vec_manipulator_rad = jnt_vec[:6]
         mot_vec_linear_axis_m = jnt_vec[6:7]
 
@@ -197,27 +229,46 @@ class RobotSystem(QObject):
     def reset(self):
         self._manipulator.reset()
 
-    def update_status(self, mot_list: list, delta_t: float):
+    def toggle_feed_hold(self):
+        if self.sys_state.grbl == ControllerState.HOLD:
+            self.g_code_generated.emit(self.gc_writer.cycle_start())
+        elif self.sys_state.grbl == ControllerState.IDLE:
+            self.g_code_generated.emit(self.gc_writer.cycle_start())
+        elif self.sys_state.grbl == ControllerState.CYCLE:
+            self.g_code_generated.emit(self.gc_writer.feed_hold())
+
+    def update_status(self, status: str, mot_list: list, delta_t: float):
         """ Update system status and return by dictionary.
         @param status: str, controller status.
         @param mot_list: List of 8 floats, motor positions as degrees.
         @param delta_t: Time in seconds since last update.
         """
+        match status:
+            case "Idle":
+                self.sys_state.grbl = ControllerState.IDLE
+            case "Run":
+                self.sys_state.grbl = ControllerState.CYCLE
+            case "Hold":
+                self.sys_state.grbl =  ControllerState.HOLD
+            case "Home":
+                self.sys_state.grbl = ControllerState.HOMING
+            case "Alarm":
+                self.sys_state.grbl = ControllerState.ALARM
+            case "Check":
+                self.sys_state.grbl = ControllerState.CHECK
+            case "Door":
+                self.sys_state.grbl = ControllerState.SAFETY_DOOR
+
         # Real motor values reported by controller
         mot_vec = np.array(mot_list)  # Degrees and millimeters
 
         # Update states
-        self._manipulator.update_state(np.deg2rad(mot_vec[:6]))  # 6 axis
-        self._linear_axis.update_state(0.001 * mot_vec[6:7])  # 1 axis
+        self._manipulator.update_mcu_state(np.deg2rad(mot_vec[:6]))  # 6 axis
+        self._linear_axis.update_mcu_state(0.001 * mot_vec[6:7])  # 1 axis
 
-        ops_pose_base: Pose = self._manipulator.state.mcu.ops_state
-
-
-        # TODO: Bring back Pose and understand this
-        # pose_base_to_world = self._linear_axis.state.mcu.base_pose.inverse()
-        # ops_pose_world: Pose = ops_pose_base.relative_to(pose_base_to_world)
-        ops_pose_world = ops_pose_base.copy()
-        ops_pose_world.position += self._linear_axis.state.mcu.position
+        tool_wrt_base: Pose = self._manipulator.state.mcu.ops_state
+        base_wrt_world = self._linear_axis.state.mcu.pose
+        tool_wrt_world = base_wrt_world.compose(tool_wrt_base)
 
         sing_vals_trans, sing_vecs_trans = self._manipulator.state.mcu.singular_data_translation
         sing_vals_rot, sing_vecs_rot = self._manipulator.state.mcu.singular_data_rotation
@@ -226,7 +277,7 @@ class RobotSystem(QObject):
         # TODO: Fix base and world
         cond_world = self._manipulator._compute_condition(np.eye(3))
         cond_base = self._manipulator._compute_condition(np.eye(3))
-        cond_tool = self._manipulator._compute_condition(ops_pose_base.rot_mat)
+        cond_tool = self._manipulator._compute_condition(tool_wrt_base.rot_mat)
 
         jnt_vec_deg = np.zeros(8)
         jnt_vec_deg[:6] = np.rad2deg(self._manipulator.state.mcu.joint_state)
@@ -234,18 +285,19 @@ class RobotSystem(QObject):
 
         # delta_t = 0.1
         alpha = 0.9
-        delta_x = LA.norm(ops_pose_base.position - self.previous_pose.position)
+        delta_x = LA.norm(tool_wrt_base.position - self.previous_pose.position)
         speed_linear: float = alpha*utils.m_s2mm_min(delta_x / delta_t) + (1-alpha)*self.speed_linear_prev
-        speed_angular: float = alpha*utils.rad_sec2deg_min(abs(ops_pose_base.quaternion.angle(self.previous_pose.quaternion)) / delta_t) + (1-alpha)*self.speed_angular_prev
+        speed_angular: float = alpha*utils.rad_sec2deg_min(abs(tool_wrt_base.quaternion.angle(self.previous_pose.quaternion)) / delta_t) + (1-alpha)*self.speed_angular_prev
         self.speed_linear_prev, self.speed_angular_prev = speed_linear, speed_angular
 
-        self.previous_pose = ops_pose_base
+        self.previous_pose = tool_wrt_base
 
         state = {
+            'status': status,
             'mot_coords_deg': np.array(mot_list),
             'jnt_coords_deg': jnt_vec_deg,
-            'ops_coords_base': ops_pose_base,
-            'ops_coords_world': ops_pose_world,
+            'ops_coords_base': tool_wrt_base,
+            'ops_coords_world': tool_wrt_world,
             'condition_world': cond_world,
             'condition_base': cond_base,
             'condition_tool': cond_tool,
