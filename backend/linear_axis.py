@@ -25,14 +25,14 @@ class LinearAxis:
     def move_jnt(jnt_vec: np.ndarray) -> np.ndarray | None:
 
         for idx in range(config.N_LIN_JNT):
-            if not config.MOTOR_LINEAR_LIMITS[f"ML{idx + 1}_MIN"] <= jnt_vec[idx] <= config.MOTOR_LINEAR_LIMITS[f"ML{idx + 1}_MAX"]:
+            if not config.JOINT_LINEAR_LIMITS[f"JL{idx + 1}_MIN"] <= jnt_vec[idx] <= config.JOINT_LINEAR_LIMITS[f"JL{idx + 1}_MAX"]:
                 print(f"Linear motor value out of range")
                 return None
 
         # Send to queue
         return jnt_vec.copy()
 
-    def update_state(self, jnt_vec: np.ndarray):
+    def update_mcu_state(self, jnt_vec: np.ndarray):
         self.state.mcu.joint_state = jnt_vec.copy()
 
     def reset(self):

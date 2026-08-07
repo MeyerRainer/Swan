@@ -28,14 +28,14 @@ JOINT_LIMITS = {
     "J5_MIN":   -100,
     "J6_MAX":   360,
     "J6_MIN":   -360,
-    "J7_MAX": 300,
+    "J7_MAX": 0,
     "J7_MIN": 0,
 }
 
 JOINT_LINEAR_LIMITS = {
-    'JL1_MAX': 300,
-    'JL1_MIN': 0,
-    'JL2_MAX': 300,
+    'JL1_MAX': 200,
+    'JL1_MIN': -200,
+    'JL2_MAX': 0,
     'JL2_MIN': 0,
 }
 
@@ -53,16 +53,16 @@ MOTOR_LIMITS = {
     "M5_MIN":   -100,
     "M6_MAX":   360,
     "M6_MIN":   -360,
-    "M7_MAX": 300,
+    "M7_MAX": 0,
     "M7_MIN": 0,
 }
 
-MOTOR_LINEAR_LIMITS = {
-    'ML1_MAX': 300,
-    'ML1_MIN': 0,
-    'ML2_MAX': 300,
-    'ML2_MIN': 0,
-}
+# MOTOR_LINEAR_LIMITS = {
+#     'ML1_MAX': 300,
+#     'ML1_MIN': 0,
+#     'ML2_MAX': 300,
+#     'ML2_MIN': 0,
+# }
 
 # Joint max speed (deg/min, mm/min)
 MOTOR_MAX_SPEED = {
@@ -91,6 +91,7 @@ DH_PARAMS = {
             'd4': np.float64(0.195),
             'd6': np.float64(0.0353)}
 
+CHAR_LEN = np.float64(0.2)  # Characteristic length, m
 
 # Tool frame respect to J6 frame
 TOOL_OFS = np.array([

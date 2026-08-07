@@ -1,5 +1,4 @@
-"""
-Class for 6-8 axis manipulator with anthropomorphic arm and spherical wrist.
+""" Class for 6 axis manipulator.
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
@@ -107,7 +106,7 @@ class Manipulator:
     # ------------------------------------ Public interface ---------------------------------------
     # ---------------------------------------------------------------------------------------------
 
-    def update_state(self, mot_vec: np.ndarray):
+    def update_mcu_state(self, mot_vec: np.ndarray):
         self.state.mcu.motor_state = mot_vec
 
     def reset(self):
@@ -250,18 +249,16 @@ class Manipulator:
         unit_vec = direction_vec / LA.norm(direction_vec)
 
         # Convert direction vector and angle to a quaternion
-        # quat_rot = utils.dir_vec_angle2quat(unit_vec, angle)  # New orientation w.rot.t current orientation cur_Q_new
         quat_rot = Quaternion.from_axis_angle(tuple(unit_vec), angle)
 
         # End posture by rotating current posture
         end_pose: Pose = self.state.queued.ops_state
         if frame == "Base" or frame == "World":
-            # new orientation w.r.t. world (base)
             end_pose.quaternion = quat_rot * end_pose.quaternion
         elif frame == "Tool":
             end_pose.quaternion = end_pose.quaternion * quat_rot
         else:
             raise ValueError("Invalid frame")
 
-        # Compute G-code list for end and intermediate postures
+        # Compute motor vectors for end and intermediate postures
         return self.move_ops_lin(end_pose, speed_angular=speed)
