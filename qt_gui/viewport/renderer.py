@@ -5,7 +5,8 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 
 
 from qt_gui.viewport.scene import SceneNode
-from qt_gui.viewport.opengl.shader import *
+# from qt_gui.viewport.opengl.shader import *
+from qt_gui.viewport.opengl.shaders_advanced import *
 from qt_gui.viewport.visuals.visual import Visual
 
 from OpenGL import GL
@@ -29,7 +30,8 @@ class SceneRenderer:
         GL.glEnable(GL.GL_DEPTH_TEST)
         GL.glDisable(GL.GL_CULL_FACE)
         # GL.glEnable(GL.GL_CULL_FACE)
-        GL.glClearColor(0.15, 0.15, 0.15, 0.5)
+        # Ambient color
+        GL.glClearColor(0.184, 0.204, 0.247, 1.)
 
         self.init_shaders()
 
@@ -41,10 +43,6 @@ class SceneRenderer:
         f = GL.glCreateShader(GL.GL_FRAGMENT_SHADER)
         GL.glShaderSource(f, FRAGMENT_SHADER_SRC)
         GL.glCompileShader(f)
-
-        # Debug.
-        # print(f"Vertex shaders: {GL.glGetShaderInfoLog(v)}")
-        # print(f"Fragment shaders: {GL.glGetShaderInfoLog(f)}")
 
         self.shader_program = GL.glCreateProgram()
 
@@ -62,17 +60,12 @@ class SceneRenderer:
         GL.glViewport(0, 0, width, height)
         # Update projection matrices if needed
 
-    def render_scene(self, root_node: SceneNode, projection_matrix: QMatrix4x4, view_matrix: QMatrix4x4):
+    def render_scene(self, root_node: SceneNode, projection_matrix: QMatrix4x4, view_matrix: QMatrix4x4, camera_pos: QVector3D):
 
         # Full clear on every frame
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
-        GL.glUseProgram(self.shader_program)
-
         if not root_node:
             return
-
-        # Identity model matrix for root
-        model = QMatrix4x4()
 
         GL.glUseProgram(self.shader_program)
 
@@ -85,6 +78,14 @@ class SceneRenderer:
         if view_loc != -1:
             GL.glUniformMatrix4fv(view_loc, 1, GL.GL_FALSE, view_matrix.data())
 
+        # Upload Camera Position for Specular and Fresnel computations
+        view_pos_loc = GL.glGetUniformLocation(self.shader_program, "viewPos")
+        if view_pos_loc != -1:
+            # GL.glUniform3f(view_pos_loc, *cam_pos)
+            GL.glUniform3f(view_pos_loc, camera_pos.x(), camera_pos.y(), camera_pos.z())
+
+        # Identity model matrix for root
+        model = QMatrix4x4()
         self._draw_node(root_node, parent_transform=model)
 
     def _draw_node(self, node: SceneNode, parent_transform: QMatrix4x4):
@@ -106,10 +107,16 @@ class SceneRenderer:
 
         gpu_data = self._gpu_cache[vis_id]
 
-        # Upload model
+        # Upload model matrix (4x4)
         model_loc = GL.glGetUniformLocation(self.shader_program, "model")
         if model_loc != -1:
             GL.glUniformMatrix4fv(model_loc, 1, GL.GL_TRUE, model_matrix.data())
+
+        # Compute and Upload Normal Matrix (3x3)
+        normal_matrix_loc = GL.glGetUniformLocation(self.shader_program, "normalMatrix")
+        if normal_matrix_loc != -1:
+            normal_matrix = model_matrix.normalMatrix()
+            GL.glUniformMatrix3fv(normal_matrix_loc, 1, GL.GL_FALSE, normal_matrix.data())
 
         loc = GL.glGetUniformLocation(self.shader_program, "diffuseColor")
 
@@ -125,24 +132,39 @@ class SceneRenderer:
         GL.glBindVertexArray(0)
 
     def _upload_visual(self, visual_id: int, visual: Visual):
-        """Uploads NumPy arrays to VBO/VAO lazily on first render."""
+        """ Uploads NumPy arrays to VBO/VAO lazily on first render.
+        """
+        # Generate automatic normals if visual.normals is empty
+        normals = visual.normals
+        if len(normals) == 0:
+            normals = np.zeros_like(visual.vertices, dtype=np.float32)
+            normals[:, 1] = 1.0  # Default up-vector fallback
+
+        # Interleave vertices and normals: [x, y, z, nx, ny, nz, ...]
+        vertex_data = np.hstack([visual.vertices, normals]).astype(np.float32)
+
         vao: int = GL.glGenVertexArrays(1)
         vbo: int = GL.glGenBuffers(1)
         ebo: int = GL.glGenBuffers(1)
 
         GL.glBindVertexArray(vao)
 
-        # Upload Vertices
+        # Upload Combined Vertex + Normal Data
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, vbo)
-        GL.glBufferData(GL.GL_ARRAY_BUFFER, visual.vertices.nbytes, visual.vertices, GL.GL_STATIC_DRAW)
+        GL.glBufferData(GL.GL_ARRAY_BUFFER, vertex_data.nbytes, vertex_data, GL.GL_STATIC_DRAW)
 
         # Upload Indices
         GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ebo)
         GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, visual.indices.nbytes, visual.indices, GL.GL_STATIC_DRAW)
 
+        stride = 6 * 4  # 6 floats total (3 position + 3 normal), 4 bytes per float
         # Attribute 0: Position
-        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, 0, None)
+        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, stride, None)
         GL.glEnableVertexAttribArray(0)
+
+        # Attribute 1: Normal (aNormal)
+        GL.glVertexAttribPointer(1, 3, GL.GL_FLOAT, GL.GL_FALSE, stride, GL.GLvoidp(12))  # 12 bytes offset
+        GL.glEnableVertexAttribArray(1)
 
         GL.glBindVertexArray(0)
 

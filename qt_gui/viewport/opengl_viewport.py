@@ -64,9 +64,10 @@ class OpenGLViewport(QOpenGLWidget):
         aspect_ratio: float = self.width() / max(self.height(), 1)
         proj_mtx = self.camera.get_projection_matrix(aspect_ratio)
         view_mtx = self.camera.get_view_matrix()
+        camera_pos: QVector3D = self.camera.get_camera_position()
 
         # Recursively render scene tree.
-        self.renderer.render_scene(root_node, proj_mtx, view_mtx)
+        self.renderer.render_scene(root_node, proj_mtx, view_mtx, camera_pos)
 
     def cleanupGL(self):
         """On shutdown.
