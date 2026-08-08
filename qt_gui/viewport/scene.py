@@ -5,11 +5,10 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 
 from __future__ import annotations
 
-from qt_gui.viewport.shapes import ArrowSpecs, RingSpecs, PlaneSpecs
-from qt_gui.viewport.visuals.frame import Arrow, Ring, Plane
+from qt_gui.viewport.shapes import ArrowSpecs, RingSpecs, PlaneSpecs, RotationRing, DragPlane, DragArrow
 from robot_math.pose import Pose
 from qt_gui.viewport.visuals.visual import Visual, Material, load_obj_file
-from qt_gui.viewport.visuals.grid import Grid
+from qt_gui.viewport.visuals.grid import Grid, GridSpecs
 
 from pathlib import Path
 from typing import override, Optional
@@ -25,7 +24,6 @@ class SceneNode:
         self.name: str = name
         self.parent: SceneNode | None = parent
         self.children: list[SceneNode] = []
-
         self.visible: bool = True
         self.selectable: bool = True
         self.expanded: bool = False
@@ -55,12 +53,12 @@ class Frame(SceneNode):
 
         super().__init__()
 
-        # self.x_axis_specs = ArrowSpecs(color=[1., 0.2, 0.2])
-        # self.visual = Arrow(self.x_axis_specs)
+        self.x_axis_specs = ArrowSpecs()
+        self.visual = DragArrow(self.x_axis_specs)
         # self.ring_specs = RingSpecs()
-        # self.visual = Ring(self.ring_specs)
-        self.plane_specs = PlaneSpecs()
-        self.visual = Plane(self.plane_specs)
+        # self.visual = RotationRing(self.ring_specs)
+        # self.plane_specs = PlaneSpecs()
+        # self.visual = DragPlane(self.plane_specs)
 
 
 
@@ -70,7 +68,7 @@ class GridNode(SceneNode):
 
         super().__init__()
 
-        self.visual = Grid(name="Grid")
+        self.visual = Grid(name="Grid", params=GridSpecs())
         self.selectable = False
 
 

@@ -2,6 +2,7 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
+from typing import Protocol, Any
 
 import numpy as np
 from pathlib import Path
@@ -25,10 +26,10 @@ class Visual:
         self.vertices: np.ndarray = np.empty((0, 3), dtype=np.float32)
         self.normals: np.ndarray = np.empty((0, 3), dtype=np.float32)
         self.textures: np.ndarray = np.empty((0, 2), dtype=np.float32)
+        self.colors: np.ndarray = np.empty((0, 4), dtype=np.float32)
         self.indices: np.ndarray = np.empty((0,), dtype=np.uint32)
 
         self.material: Material | None = None
-        self.colors: np.ndarray | None = None
 
         # GPU Buffer Handles (Populated later inside your QOpenGLWidget)
         self.vao_id: int | None = None
@@ -36,6 +37,8 @@ class Visual:
         self.ebo_id: int | None = None
 
         self.line_render: bool = False  # Triangle or line rendering.
+
+    def _build(self, params: Any) -> None: ...
 
 # def load_obj_file(file_path: Path) -> list[Visual]:
 #     """Loads an .obj file using tinyobjloader and returns a list of Visual components."""
