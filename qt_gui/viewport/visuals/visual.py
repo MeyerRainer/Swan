@@ -28,7 +28,7 @@ class Visual:
         self.indices: np.ndarray = np.empty((0,), dtype=np.uint32)
 
         self.material: Material | None = None
-        self.color: np.ndarray | None = None
+        self.colors: np.ndarray | None = None
 
         # GPU Buffer Handles (Populated later inside your QOpenGLWidget)
         self.vao_id: int | None = None
@@ -168,6 +168,31 @@ def load_obj_file(file_path: Path, to_meters: bool = True) -> list[Visual]:
             mat.ambient = np.array(mat_data.ambient, dtype=np.float32)
             mat.specular = np.array(mat_data.specular, dtype=np.float32)
             visual.material = mat
+        # Initialize a default RGBA color array (1 color per vertex, default 80% grey, 100% opaque)
+        num_vertices = len(vertices)
+        vertex_colors = np.full((num_vertices, 4), [0.8, 0.8, 0.8, 1.0], dtype=np.float32)
+
+        # If materials and material IDs per face exist
+        if mesh.material_ids and len(materials) > 0:
+            # Option A: Fast vectorization (if indices are mapped 1-to-1 or processed per triangle)
+            # Map face material IDs to vertex indices
+            tris = indices.reshape(-1, 3)
+
+            for face_idx, mat_id in enumerate(mesh.material_ids):
+                if 0 <= mat_id < len(materials):
+                    mat_data = materials[mat_id]
+                    diffuse = mat_data.diffuse  # [r, g, b]
+
+                    # Extract alpha if material has it, otherwise default to 1.0
+                    alpha = getattr(mat_data, 'dissolve', 1.0)  # 'dissolve' or 'alpha' in OBJ spec
+                    color_rgba = [diffuse[0], diffuse[1], diffuse[2], alpha]
+
+                    # Assign color to the 3 vertices belonging to this triangle face
+                    v_indices = tris[face_idx]
+                    vertex_colors[v_indices] = color_rgba
+
+        # Assign the per-vertex color array to the Visual instance
+        visual.colors = vertex_colors
 
         visuals.append(visual)
 

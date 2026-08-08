@@ -67,6 +67,6 @@ class Plane(Visual):
 
         self.indices = np.arange(len(self.vertices), dtype=np.uint32)
 
-        self.color = np.array(self.params.color)
-
+        # self.color = np.array(self.params.color)
+        self.colors = np.tile(self.params.color, (len(self.vertices), 1))
 

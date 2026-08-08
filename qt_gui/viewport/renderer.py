@@ -13,6 +13,7 @@ from OpenGL import GL
 from PyQt6.QtGui import QMatrix4x4, QVector3D
 from typing import Tuple
 import numpy as np
+import ctypes
 
 
 class SceneRenderer:
@@ -30,6 +31,11 @@ class SceneRenderer:
         GL.glEnable(GL.GL_DEPTH_TEST)
         GL.glDisable(GL.GL_CULL_FACE)
         # GL.glEnable(GL.GL_CULL_FACE)
+
+        # Enable Alpha Blending
+        GL.glEnable(GL.GL_BLEND)
+        GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
+
         # Ambient color
         GL.glClearColor(0.184, 0.204, 0.247, 1.)
 
@@ -125,14 +131,13 @@ class SceneRenderer:
             GL.glUniformMatrix3fv(normal_matrix_loc, 1, GL.GL_FALSE, normal_matrix.data())
 
         # TODO: -
-        loc = GL.glGetUniformLocation(self.shader_program, "diffuseColor")
-        if loc != -1:
-            if visual.material is not None and hasattr(visual.material, 'diffuse'):
-                color = visual.material.diffuse  # Color from material
-            else:
-                color = visual.color  # Per vertex color
-            GL.glUniform3fv(loc, 1, color)
-
+        # loc = GL.glGetUniformLocation(self.shader_program, "diffuseColor")
+        # if loc != -1:
+        #     if visual.material is not None and hasattr(visual.material, 'diffuse'):
+        #         color = visual.material.diffuse  # Color from material
+        #     else:
+        #         color = visual.color  # Per vertex color
+        #     GL.glUniform3fv(loc, 1, color)
 
         # Bind vao and draw.
         GL.glBindVertexArray(gpu_data["vao"])
@@ -166,14 +171,52 @@ class SceneRenderer:
         GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ebo)
         GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, visual.indices.nbytes, visual.indices, GL.GL_STATIC_DRAW)
 
-        stride = 6 * 4  # 6 floats total (3 position + 3 normal), 4 bytes per float.
-        # Attribute 0: Position
-        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, stride, None)
+        # stride = 6 * 4  # 6 floats total (3 position + 3 normal), 4 bytes per float.
+        # # Attribute 0: Position
+        # GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, stride, None)
+        # GL.glEnableVertexAttribArray(0)
+        #
+        # # Attribute 1: Normal (aNormal)
+        # GL.glVertexAttribPointer(1, 3, GL.GL_FLOAT, GL.GL_FALSE, stride, GL.GLvoidp(12))  # 12 bytes offset
+        # GL.glEnableVertexAttribArray(1)
+        # Fallback if visual.colors is empty or not generated
+        # if not hasattr(visual, 'color') or len(visual.color) != len(visual.vertices):
+        if visual.colors is None:
+            colors = np.full((len(visual.vertices), 4), [0.8, 0.8, 0.8, 1.0], dtype=np.float32)
+            print(f"No color")
+        else:
+            colors = visual.colors
+
+        # Combine into single interleaved array: [x, y, z, nx, ny, nz, r, g, b, a]
+        vertex_data = np.hstack([visual.vertices, visual.normals, colors]).astype(np.float32)
+
+        vao = GL.glGenVertexArrays(1)
+        vbo = GL.glGenBuffers(1)
+        ebo = GL.glGenBuffers(1)
+
+        GL.glBindVertexArray(vao)
+
+        # Upload combined buffer
+        GL.glBindBuffer(GL.GL_ARRAY_BUFFER, vbo)
+        GL.glBufferData(GL.GL_ARRAY_BUFFER, vertex_data.nbytes, vertex_data, GL.GL_STATIC_DRAW)
+
+        GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ebo)
+        GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, visual.indices.nbytes, visual.indices, GL.GL_STATIC_DRAW)
+
+        # Stride: 10 floats * 4 bytes = 40 bytes
+        stride = 10 * 4
+
+        # Attribute 0: Position (3 floats, offset 0)
+        GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, stride, ctypes.c_void_p(0))
         GL.glEnableVertexAttribArray(0)
 
-        # Attribute 1: Normal (aNormal)
-        GL.glVertexAttribPointer(1, 3, GL.GL_FLOAT, GL.GL_FALSE, stride, GL.GLvoidp(12))  # 12 bytes offset
+        # Attribute 1: Normal (3 floats, offset 12 bytes)
+        GL.glVertexAttribPointer(1, 3, GL.GL_FLOAT, GL.GL_FALSE, stride, ctypes.c_void_p(12))
         GL.glEnableVertexAttribArray(1)
+
+        # Attribute 2: Color (4 floats, offset 24 bytes)
+        GL.glVertexAttribPointer(2, 4, GL.GL_FLOAT, GL.GL_FALSE, stride, ctypes.c_void_p(24))
+        GL.glEnableVertexAttribArray(2)
 
         GL.glBindVertexArray(0)
 

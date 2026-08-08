@@ -8,7 +8,7 @@ import numpy as np
 
 class Grid(Visual):
 
-    def __init__(self, name, size=1., step=0.05, color=(0.3, 0.3, 0.3)):
+    def __init__(self, name, size=1., step=0.05, color=(0.3, 0.3, 0.3, 1.0)):
 
         super().__init__()
 
@@ -44,5 +44,6 @@ class Grid(Visual):
         # Sequential indices for lines (or triangles if rendered as GL_LINES).
         self.indices = np.arange(len(self.vertices), dtype=np.uint32)
         # Assign an explicit fallback material using the RGB parameters.
-        self.material = Material(name="GridColor")
-        self.material.diffuse = np.array([self.color[0], self.color[1], self.color[2]], dtype=np.float32)
+        self.color = np.tile(self.color, (len(self.vertices), 1))
+        # self.material = Material(name="GridColor")
+        # self.material.diffuse = np.array([self.color[0], self.color[1], self.color[2]], dtype=np.float32)

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 @dataclass
 class ArrowSpecs:
     axis: str = 'x'
-    color: Tuple[float, float, float] = (1., 0., 0.)
+    color: Tuple[float, float, float, float] = (1., 0., 0., 0.8)
     length_arrow: float  = 0.05
     length_cone: float = 0.015
     radius_shaft: float = 0.002
@@ -19,7 +19,7 @@ class ArrowSpecs:
 @dataclass
 class RingSpecs:
     normal_axis: str = 'x'
-    color: Tuple[float, float, float] = (1., 0., 0.)
+    color: Tuple[float, float, float, float] = (1., 0., 0., 0.5)
     radius_in: float = 0.04
     radius_out: float = 0.05
     n_segments: int = 32
@@ -29,7 +29,7 @@ class RingSpecs:
 class PlaneSpecs:
     u_dir: Tuple[float, float, float] = (0., 1., 0.)
     v_dir: Tuple[float, float, float] = (0., 0., 1.)
-    color: Tuple[float, float, float] = (1., 0., 0.)
+    color: Tuple[float, float, float, float] = (1., 0., 0., 0.5)
     offset: float = 0.001
     size: float = 0.030
 
