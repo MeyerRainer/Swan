@@ -5,9 +5,10 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 
 from __future__ import annotations
 
-from qt_gui.viewport.shapes import ArrowSpecs, RingSpecs, PlaneSpecs, RotationRing, DragPlane, DragArrow
+from qt_gui.viewport.shapes import ArrowSpecs, RingSpecs, PlaneSpecs, RotationRing, DragPlane, DragArrow, MeshSpecs, \
+    MeshObject
 from robot_math.pose import Pose
-from qt_gui.viewport.visuals.visual import Visual, Material, load_obj_file
+from qt_gui.viewport.visuals.visual import Visual, Material
 from qt_gui.viewport.visuals.grid import Grid, GridSpecs
 
 from pathlib import Path
@@ -110,18 +111,9 @@ class SceneGraph(QAbstractItemModel):
                 self._populate_directory_tree(entry, dir_node)
 
             elif entry.suffix.lower() == ".obj":
-                # OBJ Model node
-                obj_node = SceneNode(entry.name, parent=parent_node)
-                visuals = load_obj_file(entry)
-
-                if len(visuals) == 1:
-                    # Single mesh OBJ
-                    obj_node.visual = visuals[0]
-                elif len(visuals) > 1:
-                    # Multi-shape OBJ: create child sub-mesh nodes
-                    for idx, vis in enumerate(visuals):
-                        sub_node = SceneNode(f"Mesh_{idx}", parent=obj_node)
-                        sub_node.visual = vis
+                obj_node: SceneNode = SceneNode(name=entry.name, parent=parent_node)
+                mesh_params = MeshSpecs(file_path=entry)
+                obj_node.visual = MeshObject(mesh_params)
 
     def node_from_index(self, index: QModelIndex) -> SceneNode:
         """ Helper to extract SceneNode from QModelIndex.
