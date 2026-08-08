@@ -69,34 +69,40 @@ class SceneRenderer:
 
         GL.glUseProgram(self.shader_program)
 
-        # Upload View & Projection once per render pass
+        # Reserve locations for arrays in GPU.
         proj_loc: int = GL.glGetUniformLocation(self.shader_program, "projection")
         view_loc: int = GL.glGetUniformLocation(self.shader_program, "view")
+        cam_loc: int = GL.glGetUniformLocation(self.shader_program, "viewPos")
 
+        # Upload projection matrix to GPU.
         if proj_loc != -1:
             GL.glUniformMatrix4fv(proj_loc, 1, GL.GL_FALSE, projection_matrix.data())
+        # Upload view matrix.
         if view_loc != -1:
             GL.glUniformMatrix4fv(view_loc, 1, GL.GL_FALSE, view_matrix.data())
+        # Upload amera Position for Specular and Fresnel computations.
+        if cam_loc != -1:
+            GL.glUniform3f(cam_loc, camera_pos.x(), camera_pos.y(), camera_pos.z())
 
-        # Upload Camera Position for Specular and Fresnel computations
-        view_pos_loc = GL.glGetUniformLocation(self.shader_program, "viewPos")
-        if view_pos_loc != -1:
-            # GL.glUniform3f(view_pos_loc, *cam_pos)
-            GL.glUniform3f(view_pos_loc, camera_pos.x(), camera_pos.y(), camera_pos.z())
-
-        # Identity model matrix for root
+        # Identity model matrix for root.
         model = QMatrix4x4()
         self._draw_node(root_node, parent_transform=model)
 
-    def _draw_node(self, node: SceneNode, parent_transform: QMatrix4x4):
+    def _draw_node(self, node: SceneNode, parent_transform: QMatrix4x4) -> None:
+        """ Recursive function for rendering all renderable nodes in the scene tree.
+        :param node: Node to be rendered.
+        :param parent_transform: Pose respect to which this node is transformed.
+        """
         if not node.visible:
             return
 
         world_transform = QMatrix4x4(parent_transform)
 
+        # Only render nodes that have Visual.
         if node.visual and len(node.visual.vertices) > 0:
             self._render_visual(node.visual, world_transform)
 
+        # Recursively render the tree down to leaves.
         for child in node.children:
             self._draw_node(child, world_transform)
 
@@ -118,17 +124,20 @@ class SceneRenderer:
             normal_matrix = model_matrix.normalMatrix()
             GL.glUniformMatrix3fv(normal_matrix_loc, 1, GL.GL_FALSE, normal_matrix.data())
 
+        # TODO: -
         loc = GL.glGetUniformLocation(self.shader_program, "diffuseColor")
+        if loc != -1:
+            if visual.material is not None and hasattr(visual.material, 'diffuse'):
+                color = visual.material.diffuse  # Color from material
+            else:
+                color = visual.color  # Per vertex color
+            GL.glUniform3fv(loc, 1, color)
 
-        # Upload color
-        if visual.material is not None:
-            GL.glUniform3fv(loc, 1, visual.material.diffuse)
-        else:
-            GL.glUniform3f(loc, 0.8, 0.8, 0.8)
 
-        # Bind VAO & Draw
+        # Bind vao and draw.
         GL.glBindVertexArray(gpu_data["vao"])
-        GL.glDrawElements(GL.GL_TRIANGLES, gpu_data["index_count"], GL.GL_UNSIGNED_INT, None)
+        draw_mode = GL.GL_LINES  if visual.line_render else GL.GL_TRIANGLES
+        GL.glDrawElements(draw_mode, gpu_data["index_count"], GL.GL_UNSIGNED_INT, None)
         GL.glBindVertexArray(0)
 
     def _upload_visual(self, visual_id: int, visual: Visual):
@@ -140,7 +149,7 @@ class SceneRenderer:
             normals = np.zeros_like(visual.vertices, dtype=np.float32)
             normals[:, 1] = 1.0  # Default up-vector fallback
 
-        # Interleave vertices and normals: [x, y, z, nx, ny, nz, ...]
+        # Interleave vertices and normals: [x, y, z, nx, ny, nz]
         vertex_data = np.hstack([visual.vertices, normals]).astype(np.float32)
 
         vao: int = GL.glGenVertexArrays(1)
@@ -149,7 +158,7 @@ class SceneRenderer:
 
         GL.glBindVertexArray(vao)
 
-        # Upload Combined Vertex + Normal Data
+        # Upload concatenated vertex and normal data.
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, vbo)
         GL.glBufferData(GL.GL_ARRAY_BUFFER, vertex_data.nbytes, vertex_data, GL.GL_STATIC_DRAW)
 
@@ -157,7 +166,7 @@ class SceneRenderer:
         GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ebo)
         GL.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, visual.indices.nbytes, visual.indices, GL.GL_STATIC_DRAW)
 
-        stride = 6 * 4  # 6 floats total (3 position + 3 normal), 4 bytes per float
+        stride = 6 * 4  # 6 floats total (3 position + 3 normal), 4 bytes per float.
         # Attribute 0: Position
         GL.glVertexAttribPointer(0, 3, GL.GL_FLOAT, GL.GL_FALSE, stride, None)
         GL.glEnableVertexAttribArray(0)
@@ -168,8 +177,7 @@ class SceneRenderer:
 
         GL.glBindVertexArray(0)
 
-        print(f"Renderer: Visual uploaded")
-
+        # Cache render data.
         self._gpu_cache[visual_id] = {
             "vao": vao,
             "vbo": vbo,

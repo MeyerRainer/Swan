@@ -28,11 +28,14 @@ class Visual:
         self.indices: np.ndarray = np.empty((0,), dtype=np.uint32)
 
         self.material: Material | None = None
+        self.color: np.ndarray | None = None
 
         # GPU Buffer Handles (Populated later inside your QOpenGLWidget)
         self.vao_id: int | None = None
         self.vbo_id: int | None = None
         self.ebo_id: int | None = None
+
+        self.line_render: bool = False  # Triangle or line rendering.
 
 # def load_obj_file(file_path: Path) -> list[Visual]:
 #     """Loads an .obj file using tinyobjloader and returns a list of Visual components."""

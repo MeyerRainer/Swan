@@ -20,8 +20,7 @@ class ApplicationContext:
         self.robot_sys = RobotSystem()
         self.camera = CameraManager()
         self.vision = VisionManager()
-        self.scene = SceneGraph(root=SceneNode(name="Scene"))
-        self.scene.build_from_directory('scene/')
+        self.scene = SceneGraph(root=SceneNode(name="Scene"), dir_path="scene/")
         self.program_manager = ProgramManager(robot_sys=self.robot_sys)
         self.planner = TrajectoryPlanner()
 

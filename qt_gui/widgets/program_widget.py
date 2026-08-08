@@ -60,6 +60,7 @@ class ProgramWidget(QWidget):
 
         super().__init__()
 
+        self.program_running: bool = False
         self.allowed_extensions = {".swn", ".py"}
         self.current_dir: str = initial_dir or QDir.homePath()
 
@@ -69,15 +70,13 @@ class ProgramWidget(QWidget):
         self.write_to_file_button = QPushButton("Write to file")
         self.upload_program_button = QPushButton("Upload")
         self.run_button = QPushButton("Run")
-        self.resume_button = QPushButton("Resume")
-        self.pause_button = QPushButton("Pause")
+        self.pause_resume_button = QPushButton("Pause")
         self.stop_button = QPushButton("Stop")
         self.step_button = QPushButton("Step")
 
         self.new_program_button.setToolTip("Create a new robot program")
 
         # Text box
-        # self.text_box = QPlainTextEdit()
         self.text_box = ProgramEditor()
         self.current_line = None  # Line in text box
         self.mdi = QLineEdit()  # Manual data input
@@ -103,10 +102,9 @@ class ProgramWidget(QWidget):
         g_button_layout.addWidget(self.write_to_file_button, 0, 2)
         g_button_layout.addWidget(self.upload_program_button, 0, 3)
         g_button_layout.addWidget(self.run_button, 1, 0)
-        g_button_layout.addWidget(self.pause_button, 1, 1)
+        g_button_layout.addWidget(self.pause_resume_button, 1, 1)
         g_button_layout.addWidget(self.stop_button, 1, 2)
         g_button_layout.addWidget(self.step_button, 1, 3)
-        g_button_layout.addWidget(self.resume_button, 2, 0)
         layout_program_control.addLayout(g_button_layout)
 
         # Current file
@@ -159,3 +157,10 @@ class ProgramWidget(QWidget):
         self.current_program_label.setText(file_name)
         self.text_box.setPlainText(file_contents)
         self.write_terminal.emit("File loaded.")
+
+    def on_pause_resume(self):
+        self.program_running = not self.program_running
+        if self.program_running:
+            self.pause_resume_button.setText("Pause")
+        else:
+            self.pause_resume_button.setText("Resume")

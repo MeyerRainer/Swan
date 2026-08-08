@@ -18,7 +18,7 @@ class Camera:
 
         self.fov: float = 45.0  # Field of view, degrees.
         self.near_plane: float = 0.01  # Back plane of frustum, meters.
-        self.far_plane: float = 2.0  # Front plane of frustum, meters.
+        self.far_plane: float = 3.0  # Front plane of frustum, meters.
 
     def get_camera_position(self) -> QVector3D:
         """ Converts cameras spherical to cartesian coordinates in world space.

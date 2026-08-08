@@ -5,15 +5,18 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import override
-
-from PyQt6.QtCore import QAbstractItemModel, QModelIndex, Qt
-from PyQt6.QtGui import QIcon
-
+from qt_gui.viewport.shapes import ArrowSpecs, RingSpecs, PlaneSpecs
+from qt_gui.viewport.visuals.frame import Arrow, Ring, Plane
 from robot_math.pose import Pose
 from qt_gui.viewport.visuals.visual import Visual, Material, load_obj_file
+from qt_gui.viewport.visuals.grid import Grid
+
+from pathlib import Path
+from typing import override, Optional
+from PyQt6.QtCore import QAbstractItemModel, QModelIndex, Qt
+from PyQt6.QtGui import QIcon
 from dataclasses import dataclass, field
+
 
 class SceneNode:
 
@@ -27,9 +30,9 @@ class SceneNode:
         self.selectable: bool = True
         self.expanded: bool = False
 
-        self.pose = None  # Replace with your Pose object
-        self.visual = None  # Replace with your Visual object
-        self.icon = None  # QIcon | None
+        self.pose: Pose = Pose.identity()
+        self.visual: Optional[Visual] = None
+        self.icon = None
 
         if parent is not None:
             parent.add_child(self)
@@ -46,27 +49,48 @@ class SceneNode:
             return self.parent.children.index(self)
         return 0
 
+class Frame(SceneNode):
 
-# class Scene:
-#
-#     def __init__(self):
-#
-#         self.root = SceneNode("Scene")
+    def __init__(self):
+
+        super().__init__()
+
+        # self.x_axis_specs = ArrowSpecs(color=[1., 0.2, 0.2])
+        # self.visual = Arrow(self.x_axis_specs)
+        # self.ring_specs = RingSpecs()
+        # self.visual = Ring(self.ring_specs)
+        self.plane_specs = PlaneSpecs()
+        self.visual = Plane(self.plane_specs)
+
+
+
+class GridNode(SceneNode):
+
+    def __init__(self):
+
+        super().__init__()
+
+        self.visual = Grid(name="Grid")
+        self.selectable = False
 
 
 class SceneGraph(QAbstractItemModel):
 
-    def __init__(self, root: SceneNode | None = None, parent=None):
+    def __init__(self, root: SceneNode | None = None, parent=None, dir_path: str = ""):
 
         super().__init__(parent)
 
         self.root_node = root or SceneNode("Root")
 
+        self._build_from_directory(dir_path)
+        self.root_node.add_child(GridNode())
+        self.root_node.add_child(Frame())
+
     @property
     def root(self):
         return self.root_node
 
-    def build_from_directory(self, dir_path: str | Path):
+    def _build_from_directory(self, dir_path: str | Path):
         """Rebuilds the scene graph from a file system directory containing .obj models."""
         path = Path(dir_path)
         if not path.exists() or not path.is_dir():
