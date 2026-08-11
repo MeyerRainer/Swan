@@ -1,17 +1,24 @@
-from qt_gui.viewport.visuals.visual import Visual, Material
+""" Various renderable shapes.
 
-from pathlib import Path
-import tinyobjloader
+Author: Rainer Meyer, r.meyer494@gmail.com
+"""
+
 import math
-from typing import Tuple
 import numpy as np
+from pathlib import Path
+from typing import Tuple, Optional
 from PyQt6.QtGui import QVector3D
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+import tinyobjloader
+
+from robot_math.pose import Pose
+from qt_gui.viewport import cg_math
+from qt_gui.viewport.visuals.visual import Visual
 
 
 @dataclass
 class ArrowSpecs:
-    axis: str = 'x'
+    axis: Tuple[float, float, float]
     colors: Tuple[float, float, float, float] = (1., 0.2, 0.2, 0.8)
     length_arrow: float  = 0.05
     length_cone: float = 0.015
@@ -22,7 +29,7 @@ class ArrowSpecs:
 
 @dataclass
 class RingSpecs:
-    normal_axis: str = 'x'
+    normal_axis: Tuple[float, float, float] = (1., 0., 0.)
     colors: Tuple[float, float, float, float] = (1., 0., 0., 0.5)
     radius_in: float = 0.04
     radius_out: float = 0.05
@@ -31,8 +38,8 @@ class RingSpecs:
 
 @dataclass
 class PlaneSpecs:
-    u_dir: Tuple[float, float, float] = (0., 1., 0.)
-    v_dir: Tuple[float, float, float] = (0., 0., 1.)
+    u_dir: Tuple[float, float, float] = (1., 0., 0.)
+    v_dir: Tuple[float, float, float] = (0., 1., 0.)
     colors: Tuple[float, float, float, float] = (1., 0., 0., 0.5)
     offset: float = 0.001
     size: float = 0.030
@@ -45,6 +52,7 @@ class DragArrow(Visual):
         super().__init__()
 
         self._params = params
+        self._axis: np.ndarray = np.array(params.axis) * (params.length_arrow / np.linalg.norm(np.array(params.axis)))
 
         self._build(self._params)
 
@@ -55,16 +63,13 @@ class DragArrow(Visual):
         vertices = []
         normals = []
 
-        # Axis direction and orthogonal vectors relative to axis.
-        if params.axis == 'x':
-            axis_dir = QVector3D(1, 0, 0)
-            u_dir, v_dir = QVector3D(0, 1, 0), QVector3D(0, 0, 1)
-        elif params.axis == 'y':
-            axis_dir = QVector3D(0, 1, 0)
-            u_dir, v_dir = QVector3D(1, 0, 0), QVector3D(0, 0, 1)
-        else:  # z
-            axis_dir = QVector3D(0, 0, 1)
-            u_dir, v_dir = QVector3D(1, 0, 0), QVector3D(0, 1, 0)
+        # Build orthogonal basis
+        axis_dir: QVector3D = QVector3D(*params.axis).normalized()
+        other: QVector3D = QVector3D(1, 1, 1).normalized()
+        if math.fabs(axis_dir.dotProduct(axis_dir, other)) > 0.9:
+            other = QVector3D(-1, 1, 1).normalized()
+        u_dir: QVector3D = axis_dir.crossProduct(axis_dir, other).normalized()
+        v_dir: QVector3D = axis_dir.crossProduct(axis_dir, u_dir).normalized()
 
         # Arrow shaft
         for i in range(params.n_segments):
@@ -123,6 +128,17 @@ class DragArrow(Visual):
         self.indices = np.arange(len(self.vertices), dtype=np.uint32)
         self.colors = np.tile(params.colors, (len(self.vertices), 1))
 
+    def hit(self, ray_origin: QVector3D, ray_dir: QVector3D, pose: Pose) -> bool:
+        """ Checks if translation arrow has been hit. If so, which one.
+        :param ray_origin: Mouse ray origin (Camera or near point)
+        :param ray_dir: Direction of mouse ray. Unit vector.
+        :param pose: Pose of parent object
+        """
+        pose: Pose = pose
+        axis_origin: QVector3D = QVector3D(*pose.position)
+        axis_dir: QVector3D = QVector3D(*(pose.rot_mat @ self._axis)).normalized()
+
+        return cg_math.hit_arrow(ray_origin, ray_dir, axis_origin, axis_dir, self._params.length_arrow, 1.5 * self._params.radius_shaft)
 
 class RotationRing(Visual):
 
@@ -141,15 +157,13 @@ class RotationRing(Visual):
 
         # Determine orthogonal plane basis vectors
         # Axis direction and orthogonal vectors relative to axis.
-        if params.normal_axis == 'x':
-            normal_dir = QVector3D(1, 0, 0)
-            u_dir, v_dir = QVector3D(0, 1, 0), QVector3D(0, 0, 1)
-        elif params.normal_axis == 'y':
-            normal_dir = QVector3D(0, 1, 0)
-            u_dir, v_dir = QVector3D(1, 0, 0), QVector3D(0, 0, 1)
-        else:  # z
-            normal_dir = QVector3D(0, 0, 1)
-            u_dir, v_dir = QVector3D(1, 0, 0), QVector3D(0, 1, 0)
+        # Build orthogonal basis
+        normal_dir: QVector3D = QVector3D(*params.normal_axis).normalized()
+        other: QVector3D = QVector3D(1, 1, 1).normalized()
+        if math.fabs(normal_dir.dotProduct(normal_dir, other)) > 0.9:
+            other = QVector3D(-1, 1, 1).normalized()
+        u_dir: QVector3D = normal_dir.crossProduct(normal_dir, other).normalized()
+        v_dir: QVector3D = normal_dir.crossProduct(normal_dir, u_dir).normalized()
 
         for i in range(params.n_segments):
             # Increment in range [0, 1]
@@ -182,6 +196,17 @@ class RotationRing(Visual):
         self.indices = np.arange(len(self.vertices), dtype=np.uint32)
         self.colors = np.tile(self._params.colors, (len(self.vertices), 1))
 
+    def hit(self, ray_origin: QVector3D, ray_dir: QVector3D, pose: Pose, body_frame=True):
+
+            origin: QVector3D = QVector3D(*pose.position)
+            rot_mat = pose.rot_mat if body_frame else np.eye(3)
+
+            normal_axis: np.ndarray = np.array(self._params.normal_axis)
+            normal_axis: QVector3D = QVector3D(*(rot_mat @ normal_axis)).normalized()
+            delta_radius = 0.05 * self._params.radius_out
+
+            return cg_math.hit_rotation_ring(ray_origin, ray_dir, origin, normal_axis, self._params.radius_out, self._params.radius_in, delta_radius)
+
 
 # Translation plane mesh creation normal to axis_dir
 class DragPlane(Visual):
@@ -191,7 +216,10 @@ class DragPlane(Visual):
         super().__init__()
 
         self._params = params
-
+        # Original directions
+        self.n_dir: Optional[np.ndarray] = None
+        self.u_dir: Optional[np.ndarray] = None
+        self.v_dir: Optional[np.ndarray] = None
 
         self._build(self._params)
 
@@ -199,25 +227,27 @@ class DragPlane(Visual):
 
         vertices = []
         normals = []
-        u_dir = QVector3D(*params.u_dir)
-        v_dir = QVector3D(*params.v_dir)
+
+        u_dir: QVector3D = QVector3D(*self._params.u_dir).normalized()
+        v_dir: QVector3D = QVector3D(*self._params.v_dir).normalized()
+        n_dir: QVector3D = QVector3D.crossProduct(u_dir, v_dir)
+
+        self.n_dir = np.array([n_dir.x(), n_dir.y(), n_dir.z()])
+        self.u_dir = np.array([u_dir.x(), u_dir.y(), u_dir.z()])
+        self.v_dir = np.array([v_dir.x(), v_dir.y(), v_dir.z()])
 
         p0: QVector3D = u_dir * params.offset + v_dir * params.offset
         p1: QVector3D = p0 + u_dir * params.size
         p2: QVector3D = p0 + u_dir * params.size + v_dir * params.size
         p3: QVector3D = p0 + v_dir * params.size
 
-        # # Double-sided quad
-        # Flat plane face normal
-        normal: QVector3D = QVector3D.crossProduct(u_dir, v_dir).normalized()
-
         # Front side (+normal)
         for p in [p0, p1, p2, p0, p2, p3]:
             vertices.extend([p.x(), p.y(), p.z()])
-            normals.extend([normal.x(), normal.y(), normal.z()])
+            normals.extend([n_dir.x(), n_dir.y(), n_dir.z()])
 
         # Back side (-normal)
-        rev_normal = -normal
+        rev_normal: QVector3D = -n_dir
         for p in [p0, p2, p1, p0, p3, p2]:
             vertices.extend([p.x(), p.y(), p.z()])
             normals.extend([rev_normal.x(), rev_normal.y(), rev_normal.z()])
@@ -226,6 +256,19 @@ class DragPlane(Visual):
         self.normals = np.array(normals, dtype=np.float32).reshape(-1, 3)
         self.indices = np.arange(len(self.vertices), dtype=np.uint32)
         self.colors = np.tile(self._params.colors, (len(self.vertices), 1))
+
+    def hit(self, ray_origin: QVector3D, ray_dir: QVector3D, pose: Pose, body_frame=True):
+
+        origin: QVector3D = QVector3D(*pose.position)
+        rot_mat = pose.rot_mat if body_frame else np.eye(3)
+
+        u: QVector3D = QVector3D(*(rot_mat @ self.u_dir))
+        v: QVector3D = QVector3D(*(rot_mat @ self.v_dir))
+        n: QVector3D = QVector3D(*(rot_mat @ self.n_dir))
+
+        hit_radius_delta: float = 0.05 * self._params.size
+
+        return cg_math.hit_translation_plane(ray_origin, ray_dir, origin, u, v, n, self._params.size, self._params.offset, hit_radius_delta)
 
 
 @dataclass
@@ -343,7 +386,6 @@ class MeshObject(Visual):
             self.textures = np.empty((0, 2), dtype=np.float32)
             self.colors = np.empty((0, 4), dtype=np.float32)
             self.indices = np.empty((0,), dtype=np.uint32)
-
 
     # def _build(self, params: MeshSpecs) -> None:
     #     """ Loads an .obj file using tinyobjloader and returns a list of Visual components.

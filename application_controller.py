@@ -2,12 +2,12 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
-import utils
-
 from typing import Tuple
 from PyQt6.QtCore import QObject
 import numpy as np
 import time
+
+import utils
 
 
 class ApplicationController(QObject):
@@ -86,6 +86,7 @@ class ApplicationController(QObject):
 
         # ========================================== Viewport ============================================
         self.main_window.viewport_tabs.currentChanged.connect(self.on_viewport_tab_change)
+        self.main_window.view_scene.renderer.root_node = self.app_context.scene.root_node
 
         # =========================================== Camera =============================================
         # GUI -> Context
@@ -110,7 +111,7 @@ class ApplicationController(QObject):
 
         # ========================================= Scene panel ==========================================
         self.main_window.scene_panel.scene_tree.setModel(self.app_context.scene)
-        self.main_window.view_scene.set_scene_provider(lambda: self.app_context.scene.root)
+        self.main_window.view_scene.set_scene_graph_root(self.app_context.scene.root_node)
 
     def on_viewport_tab_change(self, index):
 

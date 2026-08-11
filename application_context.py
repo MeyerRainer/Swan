@@ -2,12 +2,12 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
+from qt_gui.viewport.scene import *
 
 from backend.gc_serial import GCSerial
 from backend.robot_system import RobotSystem
 from backend.camera_manager import CameraManager
 from backend.vision_manager import VisionManager
-from qt_gui.viewport.scene import *
 from robot_program.program_manager import ProgramManager
 from planner.trajectory_planner import TrajectoryPlanner
 
@@ -20,9 +20,11 @@ class ApplicationContext:
         self.robot_sys = RobotSystem()
         self.camera = CameraManager()
         self.vision = VisionManager()
-        self.scene = SceneGraph(root=SceneNode(name="Scene"), dir_path="scene/")
+        self.scene = SceneGraph(root=None, dir_path="scene/")
         self.program_manager = ProgramManager(robot_sys=self.robot_sys)
         self.planner = TrajectoryPlanner()
+
+        # print(f"App context: Number of scene nodes: {self.scene.size()}")
 
         self.connect_signals()
 

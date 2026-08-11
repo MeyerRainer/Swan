@@ -2,13 +2,11 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
-
 from PyQt6.QtWidgets import QWidget
-
-from qt_gui.viewport.scene_camera import Camera
-
 from PyQt6.QtCore import QObject, Qt
 from PyQt6.QtGui import QMouseEvent, QWheelEvent
+
+from qt_gui.viewport.scene_camera import Camera
 
 
 class CameraController(QObject):
@@ -35,12 +33,14 @@ class CameraController(QObject):
 
         # Orbit. (Left Click or Alt + Left Click)
         if event.buttons() & Qt.MouseButton.RightButton:
+            # pass
             self.camera.rotate(delta_azimuth=-delta.x() * 0.01, delta_elevation = delta.y() * 0.01)
             self.opengl_widget.update()
 
         # Pan. (Middle Click or Right Click)
         # elif event.buttons() & (Qt.MouseButton.MiddleButton | Qt.MouseButton.RightButton):
         elif event.buttons() & Qt.MouseButton.LeftButton:
+            # pass
             self.camera.pan(dx=delta.x(), dy=delta.y())
             self.opengl_widget.update()
 

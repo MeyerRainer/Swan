@@ -61,8 +61,8 @@ def hit_arrow(ray_origin: QVector3D, ray_dir: QVector3D, axis_origin: QVector3D,
     d: float = QVector3D.dotProduct(u, w)
     e: float = QVector3D.dotProduct(v, w)
 
+    # print(f"a: {a}\tb: {b}\tc: {c}\td: {d}\te: {e}")
     denom = a * c - b * b
-
     if abs(denom) > 1e-5:
         sc = (b * e - c * d) / denom
         tc = (a * e - b * d) / denom

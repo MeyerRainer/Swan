@@ -3,8 +3,15 @@
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from typing import Protocol, Any
-
 import numpy as np
+
+from qt_gui.viewport.render.renderer import RenderContext
+from robot_math.pose import Pose
+
+
+class Renderable(Protocol):
+
+    def render(self, context: RenderContext, pose: Pose) -> None: ...
 
 
 class Material:
@@ -18,8 +25,11 @@ class Material:
 
 
 class Visual:
-    """Holds CPU-side 3D geometry and material data ready for OpenGL upload."""
+    """Holds CPU-side 3D geometry and material data ready for OpenGL upload.
+    """
+
     def __init__(self):
+
         # Flattened NumPy arrays ready to pass to glBufferData
         self.vertices: np.ndarray = np.empty((0, 3), dtype=np.float32)
         self.normals: np.ndarray = np.empty((0, 3), dtype=np.float32)
@@ -35,5 +45,8 @@ class Visual:
         self.ebo_id: int | None = None
 
         self.line_render: bool = False  # Triangle or line rendering.
+
+    def render(self, context: RenderContext, pose: Pose):
+        context.renderer.render_visual(self, pose)
 
     def _build(self, params: Any) -> None: ...
