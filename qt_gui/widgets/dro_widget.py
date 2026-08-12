@@ -248,9 +248,9 @@ class DROWidget(QWidget):
         self.quaternion_j.setText(f"{quaternion.y:.3f}")
         self.quaternion_k.setText(f"{quaternion.z:.3f}")
 
-        self.zyz_euler_1.setText(f"{zyz[0]:.3f}")
-        self.zyz_euler_2.setText(f"{zyz[1]:.3f}")
-        self.zyz_euler_3.setText(f"{zyz[2]:.3f}")
+        self.zyz_euler_1.setText(f"{np.rad2deg(zyz[0]):.2f}")
+        self.zyz_euler_2.setText(f"{np.rad2deg(zyz[1]):.2f}")
+        self.zyz_euler_3.setText(f"{np.rad2deg(zyz[2]):.2f}")
 
         # Speeds
         self.speed_linear.setText(f"{status['speed_linear']:.3f}")

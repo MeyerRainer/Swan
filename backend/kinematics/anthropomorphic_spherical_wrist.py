@@ -3,36 +3,45 @@ Based on the book: L.Sciavicco and B.Siciliano, Modelling and Control of Robot M
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
-
-import config
-from config import *
-import utils
-from robot_math.pose import Pose
-
-from typing import Tuple, Union
+from enum import Enum, auto
 import numpy as np
 
-IK_SOLUTION = {
-    "SUCCESS": 0,
-    "J1_LIM_TRIG": 1,
-    "J2_LIM_TRIG": 2,
-    "J3_LIM_TRIG": 3,
-    "J4_LIM_TRIG": 4,
-    "J5_LIM_TRIG": 5,
-    "J6_LIM_TRIG": 6,
-    "J7_LIM_TRIG": 7,
-    "SHOULDER_SINGULARITY": 10,
-    "ELBOW_SINGULARITY": 11,
-    "WRIST_SINGULARITY": 12,
-    "WRIST_FLIPPED": 13,
-}
+from config import *
+import config
+import utils
+from robot_math.pose import Pose
+from typing import Tuple, List, Optional
+
+
+class IkSolution(Enum):
+    SUCCESS = auto()
+    J1_LIM_TRIG = auto()
+    J2_LIM_TRIG = auto()
+    J3_LIM_TRIG = auto()
+    J4_LIM_TRIG = auto()
+    J5_LIM_TRIG = auto()
+    J6_LIM_TRIG = auto()
+    J7_LIM_TRIG = auto()
+    SHOULDER_SINGULARITY =  auto()
+    ELBOW_SINGULARITY =  auto()
+    WRIST_SINGULARITY =  auto()
+    WRIST_FLIPPED =  auto()
 
 
 class ASWKinematics:
 
-    def __init__(self, DH: dict):
+    def __init__(self, DH: List[dict]):
 
-        self.DH = DH  # Denavit Hartenberg parameters
+        # Denavit-Hartenberg table.
+        self.DH = DH
+        self.DH_old = config.DH_PARAMS
+
+        # Trigonometric functions for kinematic calibration.
+        self.sin_alpha = []
+        self.cos_alpha = []
+        for dh_row in self.DH:
+            self.sin_alpha.append(np.sin(dh_row['alpha'], dtype=np.float64))
+            self.cos_alpha.append(np.cos(dh_row['alpha'], dtype=np.float64))
 
     @staticmethod
     def mot2jnt(mot_vec: np.ndarray) -> np.ndarray:
@@ -54,101 +63,84 @@ class ASWKinematics:
         mot_vec[2] = jnt_vec[2] + jnt_vec[1]
         return mot_vec
 
-    def forward(self, jnt_vec: np.ndarray):
+    def forward(self, jnt_vec: np.ndarray) -> List[Pose]:
         """ Forward kinematics. Joint space -> operational space.
         :param jnt_vec: Absolute joint coordinates, radians.
-        :return: Pose-object
+        :return: List of Pose-objects, one for each link.
         """
-        # DH-parameters, manipulator dimension constants
-        a1, a2, a3 = self.DH['a1'], self.DH['a2'], self.DH['a3']
-        d1, d4, d6 = self.DH['d1'], self.DH['d4'], self.DH['d6']
+        link_poses: List[Pose] = []
+        T_previous: np.ndarray = np.eye(4, dtype=np.float64)
+        for idx, row in enumerate(self.DH):
+            # Trig functions
+            s_nu, c_nu = np.sin(jnt_vec[idx] + row['nu_offset']), np.cos(jnt_vec[idx] + row['nu_offset'])
+            s_al, c_al = self.sin_alpha[idx], self.cos_alpha[idx]
 
-        # Joint values
-        th1, th2, th3 = jnt_vec[0], jnt_vec[1], jnt_vec[2]
-        th4, th5, th6 = jnt_vec[3], jnt_vec[4], jnt_vec[5]
+            # Construct SE3 transformation matrix. Link i w.r.t. link i-1.
+            T: np.ndarray = np.array([
+                [c_nu, -s_nu*c_al, s_nu*s_al, row['a']*c_nu],
+                [s_nu, c_nu*c_al, -c_nu*s_al, row['a']*s_nu],
+                [np.float64(0), s_al, c_al, row['d']],
+                [np.float64(0), np.float64(0), np.float64(0), np.float64(1)]
+            ])
+            # Append new composite pose representing link i w.r.t. base.
+            link_i_wrt_base: np.ndarray = T_previous @ T
+            link_poses.append(Pose.from_SE3(link_i_wrt_base))
+            T_previous = link_i_wrt_base
 
-        # Account for custom zero-position
-        th2 += np.pi / 2
+        # Add tool transformation.
+        link_poses.append(Pose.from_SE3(link_poses[-1].SE3 @ config.TOOL_OFS))
 
-        # Precomputing trig functions
-        c1, c2, c4, c5, c6, c23 = np.cos(th1), np.cos(th2), np.cos(th4), np.cos(th5), np.cos(th6), np.cos(th2 + th3)
-        s1, s2, s4, s5, s6, s23 = np.sin(th1), np.sin(th2), np.sin(th4), np.sin(th5), np.sin(th6), np.sin(th2 + th3)
-
-        # Precompute repeating expressions
-        # i and j components of tool frames x-unit vector
-        x_hat_i = c23 * (c4 * c5 * c6 - s4 * s6) - s23 * s5 * c6
-        x_hat_j = s4 * c5 * c6 + c4 * s6
-        # i and j components of tool frames y-unit vector
-        y_hat_i = -c23 * (c4 * c5 * s6 + s4 * c6) + s23 * s5 * s6
-        y_hat_j = -s4 * c5 * s6 + c4 * c6
-
-        # Wrist pose respect to base frame
-        wrist_pose = np.eye(4, dtype=np.float64)
-
-        # Spherical wrist position in base frame
-        wrist_pose[0, 3] = a1 * c1 + a2 * c1 * c2 + a3 * c1 * c23 + d4 * c1 * s23
-        wrist_pose[1, 3] = a1 * s1 + a2 * s1 * c2 + a3 * s1 * c23 + d4 * s1 * s23
-        wrist_pose[2, 3] = d1 + a2 * s2 + a3 * s23 - d4 * c23
-
-        # Wrist orientation respect to base frame (Tool orientation to be added)
-        wrist_pose[0, 0] = c1 * x_hat_i + s1 * x_hat_j
-        wrist_pose[1, 0] = s1 * x_hat_i - c1 * x_hat_j
-        wrist_pose[2, 0] = s23 * (c4 * c5 * c6 - s4 * s6) + c23 * s5 * c6
-        wrist_pose[0, 1] = c1 * y_hat_i + s1 * y_hat_j
-        wrist_pose[1, 1] = s1 * y_hat_i - c1 * y_hat_j
-        wrist_pose[2, 1] = -s23 * (c4 * c5 * s6 + s4 * c6) - c23 * s5 * s6
-        wrist_pose[:3, 2] = np.cross(wrist_pose[:3, 0], wrist_pose[:3, 1])
-
-        # Tool frame respect to base frame
-        tool_pose = wrist_pose @ config.TOOL_OFS
-
-        return Pose.from_SE3(tool_pose)
+        return link_poses
 
     def inverse(self, target_pose: Pose, prev_jnt_vec: np.ndarray, shoulder_flip: bool = False,
-               elbow_down: bool = False, wrist_flip: bool = False) -> Tuple[Union[None, np.ndarray], int]:
+               elbow_down: bool = False, wrist_flip: bool = False, jnt_correction=False) -> Tuple[Optional[np.ndarray], IkSolution]:
         """ Inverse kinematics. Operational space -> joint space, if solution exists.
-        @param target_pose: 6D Pose object
-        @param shoulder_flip: False: J2<0 for leaning forward. True: J2>0 for leaning forward.
-        @param elbow_down: False: Elbow angled upwards. True: Elbow angled downwards.
-        @param wrist_flip: J5 < 0 or J5 > 0. Currently, not in use.
-        @return: Tuple[IK_SOLUTION, jnt_coords].
+        :param target_pose: 6D Pose object.
+        :param prev_jnt_vec: Previous solution used in case of singularity.
+        :param shoulder_flip: False: J2<0 for leaning forward. True: J2>0 for leaning forward.
+        :param elbow_down: False: Elbow angled upwards. True: Elbow angled downwards.
+        :param wrist_flip: J5 < 0 or J5 > 0. Currently, not in use. Closer solution is chosen.
+        :param jnt_correction: Additional correction vector based on kinematic calibration.
+        :return: Tuple[IkSolution, jnt_coords].
         """
         # DH-parameters, manipulator dimension constants
-        a1, a2, a3 = self.DH['a1'], self.DH['a2'], self.DH['a3']
-        d1, d4, d6 = self.DH['d1'], self.DH['d4'], self.DH['d6']
+        a1, a2, a3 = self.DH[0]['a'], self.DH[1]['a'], self.DH[2]['a']
+        d1, d4, d6 = self.DH[0]['d'], self.DH[3]['d'], self.DH[5]['d']
 
         # Because we have elbow offset(a3), we need the distance and angle
         # of the virtual d4 vector from J3 axis to spherical wrist
         elbow2wrist = np.sqrt(a3 * a3 + d4 * d4)
-        th3off = np.atan(a3 / d4)  # Theta 3 offset
+        th3off = np.atan(a3 / d4)  # Theta 3 offset.
 
-        # Backwards rotation from target pose to find wrist pose
-        wrist_pose = target_pose.SE3 @ config.INV_TOOL_OFS
+        # Backwards rotation from target pose to find tool flange.
+        tool_flange_pose = target_pose.SE3 @ config.INV_TOOL_OFS
+        # Backwards translation to find spherical wrist pose.
+        wrist_pose: np.ndarray = tool_flange_pose.copy()
+        wrist_pose[:3, 3] -= d6 * tool_flange_pose[:3, 2]
         wx, wy, wz = wrist_pose[0, 3], wrist_pose[1, 3], wrist_pose[2, 3]
 
-        # Solve Joint 1 and check limit
+        # Solve Joint 1 and check limit.
         # TODO: wy = wx = 0 leads to shoulder singularity! Then we must define J1 based on additional information!
 
         if shoulder_flip:
             theta1 = np.pi + np.atan2(wy, wx)
         else:
             theta1 = np.atan2(wy, wx)
-            # if max < theta1 < min
         if not JOINT_LIMITS['J1_MIN'] <= np.rad2deg(theta1) <= JOINT_LIMITS['J1_MAX']:
-            return None, IK_SOLUTION['J1_LIM_TRIG']
+            return None, IkSolution.J1_LIM_TRIG
 
-        # Shift spherical wrist location closer to accounting for d1 and a1 offsets
+        # Shift spherical wrist location closer to accounting for d1 and a1 offsets.
         c1, s1 = np.cos(theta1), np.sin(theta1)
         wx -= a1 * c1
         wy -= a1 * s1
         wz -= d1
 
-        # Solve Joint 3 and check limit
-        base2wrist_sqr = wx*wx + wy*wy + wz*wz  # Repeating expression
+        # Solve Joint 3 and check limit.
+        base2wrist_sqr = wx*wx + wy*wy + wz*wz  # Repeating expression.
         cos_theta3 = (base2wrist_sqr - a2 * a2 - elbow2wrist * elbow2wrist) / (2.0 * a2 * elbow2wrist)
         # Point out of reach. No solution.
         if cos_theta3 < -1 or cos_theta3 > 1:
-            return None, IK_SOLUTION['ELBOW_SINGULARITY']
+            return None, IkSolution.ELBOW_SINGULARITY
         if elbow_down:
             sin_theta3 = np.sqrt(1 - cos_theta3 * cos_theta3)
         else:
@@ -157,37 +149,37 @@ class ASWKinematics:
             theta3 = -np.atan2(sin_theta3, cos_theta3)
         else:
             theta3 = np.atan2(sin_theta3, cos_theta3)
-        theta3 += np.pi/2  # Custom zero offset
-        theta3 -= th3off  # Angle offset caused by DH-parameter "a3"
+        theta3 += np.pi/2  # Custom zero offset.
+        theta3 -= th3off  # Angle offset caused by DH-parameter "a3".
         if not JOINT_LIMITS['J3_MIN'] <= np.rad2deg(theta3) <= JOINT_LIMITS['J3_MAX']:
-            return None, IK_SOLUTION['J3_LIM_TRIG']
+            return None, IkSolution.J3_LIM_TRIG
 
-        # Solve Joint 2 and check limit
+        # Solve Joint 2 and check limit.
         cos_theta2 = ((a2 + elbow2wrist * cos_theta3) * np.sqrt(wx * wx + wy * wy) + elbow2wrist * sin_theta3 * wz) / base2wrist_sqr
         sin_theta2 = ((a2 + elbow2wrist * cos_theta3) * wz - elbow2wrist * sin_theta3 * np.sqrt(wx * wx + wy * wy)) / base2wrist_sqr
         if shoulder_flip:
             theta2 = np.pi - np.atan2(sin_theta2, cos_theta2)
         else:
             theta2 = np.atan2(sin_theta2, cos_theta2)
-        theta2 -= np.pi/2  # Custom zero offset
+        theta2 -= np.pi/2  # Custom zero offset.
         if not JOINT_LIMITS['J2_MIN'] <= np.rad2deg(theta2) <= JOINT_LIMITS['J2_MAX']:
-            return None, IK_SOLUTION['J2_LIM_TRIG']
+            return None, IkSolution.J2_LIM_TRIG
 
-        # Spherical wrists: Solve Joints 4-6. Compute orientation resulting from joints 1-3
-        # and subtract that from desired end effector orientation
+        # Spherical wrists: Solve Joints 4-6. Compute orientation resulting from joints 1-3.
+        # and subtract that from desired end effector orientation.
         c23 = np.cos(theta2 + theta3)
         s23 = np.sin(theta2 + theta3)
 
-        # Anthropomorphic arms transposed / inverted orientation
+        # Anthropomorphic arms transposed / inverted orientation.
         pose_arm_inverted = np.array([
             [-c1 * s23, -s1 * s23, c23],
             [s1, -c1, 0],
             [c1 * c23, s1 * c23, s23]], dtype=np.float64)
 
-        # pose_wrist_rot_mat describes desired end effector pose respect to arms (link 3) current pose
+        # pose_wrist_rot_mat describes desired end effector pose respect to arms (link 3) current pose.
         pose_wrist_rot_mat = pose_arm_inverted @ wrist_pose[:3, :3]
 
-        # Convert to ZYZ Euler angles and checking limits
+        # Convert to ZYZ Euler angles and checking limits.
         wrist_sol_1, wrist_singularity_1 = utils.rot2zyz(pose_wrist_rot_mat, phi_prev=prev_jnt_vec[3], psi_prev=prev_jnt_vec[5], flip=True)
         wrist_sol_2, wrist_singularity_2 = utils.rot2zyz(pose_wrist_rot_mat, phi_prev=prev_jnt_vec[3], psi_prev=prev_jnt_vec[5], flip=False)
 
@@ -198,15 +190,15 @@ class ASWKinematics:
         for sol in wrist_solutions:
             theta4 = sol[0]
             if not JOINT_LIMITS['J4_MIN'] <= np.rad2deg(theta4) <= JOINT_LIMITS['J4_MAX']:
-                error = IK_SOLUTION['J4_LIM_TRIG']
+                error = IkSolution.J4_LIM_TRIG
                 continue
             theta5 = sol[1]
             if not JOINT_LIMITS['J5_MIN'] <= np.rad2deg(theta5) <= JOINT_LIMITS['J5_MAX']:
-                error = IK_SOLUTION['J5_LIM_TRIG']
+                error = IkSolution.J5_LIM_TRIG
                 continue
             theta6 = sol[2]
             if not JOINT_LIMITS['J6_MIN'] <= np.rad2deg(theta6) <= JOINT_LIMITS['J6_MAX']:
-                error = IK_SOLUTION['J6_LIM_TRIG']
+                error = IkSolution.J6_LIM_TRIG
                 continue
             if error is None:
                 break
@@ -214,7 +206,7 @@ class ASWKinematics:
         if error is not None:
             return None, error
 
-        return np.array((theta1, theta2, theta3, theta4, theta5, theta6)), IK_SOLUTION['SUCCESS']
+        return np.array((theta1, theta2, theta3, theta4, theta5, theta6)), IkSolution.SUCCESS
 
     def jacobian(self, jnt_vec: np.ndarray):
         """ Computes the 6x6 Jacobian matrix between motor space and operational space.
@@ -222,11 +214,8 @@ class ASWKinematics:
         """
 
         # DH-parameters, manipulator dimension constants
-        a1 = self.DH['a1']
-        a2 = self.DH['a2']
-        a3 = self.DH['a3']
-        d4 = self.DH['d4']
-        d6 = self.DH['d6']
+        a1, a2, a3 = self.DH[0]['a'], self.DH[1]['a'], self.DH[2]['a']
+        d1, d4, d6 = self.DH[0]['d'], self.DH[3]['d'], self.DH[5]['d']
 
         # Current joint coordinates
         th1 = jnt_vec[0]
@@ -321,9 +310,28 @@ class ASWKinematics:
 
     @staticmethod
     def tool_jacobian(J: np.ndarray, tool_rot_mat: np.ndarray):
-        """ Rotate manipulator jacobian into tool frame """
+        """
+        :param J: Jacobian respect to base frame.
+        :param tool_rot_mat: Base to tool rotation matrix.
+        :return: Jacobian respect to tool frame.
+        """
         R = np.eye(6, dtype=np.float64)
         R[:3, :3] = tool_rot_mat
         R[3:, 3:] = tool_rot_mat
 
         return R @ J  # Jacobian matrix in tool frame
+    
+    def parameter_jacobian(self, jnt_vec: np.ndarray) -> np.ndarray:
+        """ Jacobian of cartesian space respect to parameter space.
+        :param jnt_vec: Absolute joint coordinates in radians.
+        :return:
+        """
+        # Parameter space
+        a1, a2, a3, a4, a5, a6 = self.DH[0]['a'], self.DH[1]['a'], self.DH[2]['a'], self.DH[3]['a'], self.DH[4]['a'], self.DH[5]['a']
+        al1, al2, al3, al4, al5, al6 = self.DH[0]['alpha'], self.DH[1]['alpha'], self.DH[2]['alpha'], self.DH[3]['alpha'], self.DH[4]['alpha'], self.DH[5]['alpha']
+        d1, d2, d3, d4, d5, d6 = self.DH[0]['d'], self.DH[1]['d'], self.DH[2]['d'], self.DH[3]['d'], self.DH[4]['d'], self.DH[5]['d']
+        nu1, nu2, nu3, nu4, nu5, nu6 = self.DH[0]['nu'], self.DH[1]['nu'], self.DH[2]['nu'], self.DH[3]['nu'], self.DH[4]['nu'], self.DH[5]['nu']
+
+        J = np.zeros((6, 24))
+
+        return J
