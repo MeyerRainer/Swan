@@ -15,13 +15,12 @@ from typing import Tuple, List, Optional
 
 class IkSolution(Enum):
     SUCCESS = auto()
-    J1_LIM_TRIG = auto()
-    J2_LIM_TRIG = auto()
-    J3_LIM_TRIG = auto()
-    J4_LIM_TRIG = auto()
-    J5_LIM_TRIG = auto()
-    J6_LIM_TRIG = auto()
-    J7_LIM_TRIG = auto()
+    J1_LIMIT = auto()
+    J2_LIMIT = auto()
+    J3_LIMIT = auto()
+    J4_LIMIT = auto()
+    J5_LIMIT = auto()
+    J6_LIMIT = auto()
     SHOULDER_SINGULARITY =  auto()
     ELBOW_SINGULARITY =  auto()
     WRIST_SINGULARITY =  auto()
@@ -127,7 +126,7 @@ class ASWKinematics:
         else:
             theta1 = np.atan2(wy, wx)
         if not JOINT_LIMITS['J1_MIN'] <= np.rad2deg(theta1) <= JOINT_LIMITS['J1_MAX']:
-            return None, IkSolution.J1_LIM_TRIG
+            return None, IkSolution.J1_LIMIT
 
         # Shift spherical wrist location closer to accounting for d1 and a1 offsets.
         c1, s1 = np.cos(theta1), np.sin(theta1)
@@ -152,7 +151,7 @@ class ASWKinematics:
         theta3 += np.pi/2  # Custom zero offset.
         theta3 -= th3off  # Angle offset caused by DH-parameter "a3".
         if not JOINT_LIMITS['J3_MIN'] <= np.rad2deg(theta3) <= JOINT_LIMITS['J3_MAX']:
-            return None, IkSolution.J3_LIM_TRIG
+            return None, IkSolution.J3_LIMIT
 
         # Solve Joint 2 and check limit.
         cos_theta2 = ((a2 + elbow2wrist * cos_theta3) * np.sqrt(wx * wx + wy * wy) + elbow2wrist * sin_theta3 * wz) / base2wrist_sqr
@@ -163,7 +162,7 @@ class ASWKinematics:
             theta2 = np.atan2(sin_theta2, cos_theta2)
         theta2 -= np.pi/2  # Custom zero offset.
         if not JOINT_LIMITS['J2_MIN'] <= np.rad2deg(theta2) <= JOINT_LIMITS['J2_MAX']:
-            return None, IkSolution.J2_LIM_TRIG
+            return None, IkSolution.J2_LIMIT
 
         # Spherical wrists: Solve Joints 4-6. Compute orientation resulting from joints 1-3.
         # and subtract that from desired end effector orientation.
@@ -190,15 +189,15 @@ class ASWKinematics:
         for sol in wrist_solutions:
             theta4 = sol[0]
             if not JOINT_LIMITS['J4_MIN'] <= np.rad2deg(theta4) <= JOINT_LIMITS['J4_MAX']:
-                error = IkSolution.J4_LIM_TRIG
+                error = IkSolution.J4_LIMIT
                 continue
             theta5 = sol[1]
             if not JOINT_LIMITS['J5_MIN'] <= np.rad2deg(theta5) <= JOINT_LIMITS['J5_MAX']:
-                error = IkSolution.J5_LIM_TRIG
+                error = IkSolution.J5_LIMIT
                 continue
             theta6 = sol[2]
             if not JOINT_LIMITS['J6_MIN'] <= np.rad2deg(theta6) <= JOINT_LIMITS['J6_MAX']:
-                error = IkSolution.J6_LIM_TRIG
+                error = IkSolution.J6_LIMIT
                 continue
             if error is None:
                 break

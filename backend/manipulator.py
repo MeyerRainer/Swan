@@ -7,7 +7,7 @@ from config import *
 from robot_math.pose import Pose
 from robot_math.quaternion import Quaternion
 from backend.manipulator_state import ManipulatorState
-from backend.kinematics.anthropomorphic_spherical_wrist import ASWKinematics
+from backend.kinematics.anthropomorphic_spherical_wrist import *
 
 from math import sqrt, fabs
 from typing import Tuple
@@ -16,30 +16,12 @@ from numpy import linalg as LA
 
 np.set_printoptions(precision=3, suppress=True)
 
-IK_SOLUTION = {
-    "SUCCESS": 0,
-    "J1_LIM_TRIG": 1,
-    "J2_LIM_TRIG": 2,
-    "J3_LIM_TRIG": 3,
-    "J4_LIM_TRIG": 4,
-    "J5_LIM_TRIG": 5,
-    "J6_LIM_TRIG": 6,
-    "J7_LIM_TRIG": 7,
-    "SHOULDER_SINGULARITY": 10,
-    "ELBOW_SINGULARITY": 11,
-    "WRIST_SINGULARITY": 12,
-    "WRIST_FLIPPED": 13,
-}
-
 
 class Manipulator:
 
     def __init__(self):
 
-        # Default height: d1 + a2 + a3 = 0.325
-        # Default length: a1 + d4 + d6 <=> 0.30+0.190+0.030=0.250
-
-        self.kinematics = ASWKinematics(DH=config.DH_PARAMS)
+        self.kinematics = ASWKinematics(DH=config.DH_TABLE)
 
         self.state = ManipulatorState(self.kinematics)
 
@@ -195,7 +177,7 @@ class Manipulator:
             t = (1+idx) / n_segments  # Interpolation parameter in range [0, 1]
             interp_pose = current_pose.interpolate(target_pose, t)
             interp_jnt_vec, ik_sol = self.kinematics.inverse(interp_pose, prev_jnt_vec=current_jnt_vec)
-            if ik_sol != IK_SOLUTION['SUCCESS']:
+            if ik_sol != IkSolution.SUCCESS:
                 print(f"move_ops_lin: IK fail: {ik_sol}")
                 return None
 

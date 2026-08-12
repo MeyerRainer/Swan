@@ -2,7 +2,7 @@
 
 Author: Rainer Meyer, rot.meyer494@gmail.com
 """
-from backend.manipulator import Manipulator, IK_SOLUTION
+from backend.manipulator import Manipulator
 from backend.linear_axis import LinearAxis
 from backend.g_code_writer import GCodeWriter
 from backend.system_state import SystemState, ControllerState
@@ -195,10 +195,13 @@ class RobotSystem(QObject):
         :param frame: Frame direction vector is described in. "World", "Base" or "Tool"
         """
         # Compute list of G-code for translational move
-        mot_vecs, segment_time = self._manipulator.translate_tool(direction_vec, distance, speed, frame)
-        if mot_vecs is None:
-            self.send_terminal("Translation failed.")
+        ret = self._manipulator.translate_tool(direction_vec, distance, speed, frame)
+        if ret is None:
+            self.send_terminal.emit("Translation failed.")
             return False
+
+        # Unpack motor values and segment time.
+        mot_vecs, segment_time = ret
 
         # Send G-code to serial
         for vec in mot_vecs:
@@ -215,10 +218,13 @@ class RobotSystem(QObject):
         :param frame: Frame respect to which direction vector is described. "World", "Base" or "Tool"
         """
         # Compute list of G-code for rotational move
-        mot_vecs, segment_time = self._manipulator.rotate_tool(direction_vec, angle, speed, frame)
-        if mot_vecs is None:
-            self.send_terminal("Rotation failed.")
+        ret = self._manipulator.rotate_tool(direction_vec, angle, speed, frame)
+        if ret is None:
+            self.send_terminal.emit("Rotation failed.")
             return False
+
+        # Unpack motor values and segment time.
+        mot_vecs, segment_time = ret
 
         # Send G-code to serial
         for vec in mot_vecs:
@@ -298,6 +304,7 @@ class RobotSystem(QObject):
             'jnt_coords_deg': jnt_vec_deg,
             'ops_coords_base': tool_wrt_base,
             'ops_coords_world': tool_wrt_world,
+            'link_poses': self._manipulator.state.mcu.link_poses,
             'condition_world': cond_world,
             'condition_base': cond_base,
             'condition_tool': cond_tool,

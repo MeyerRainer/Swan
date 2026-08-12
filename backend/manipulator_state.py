@@ -7,6 +7,8 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 
 from dataclasses import dataclass
+from typing import List
+
 from robot_math.pose import Pose
 import numpy as np
 
@@ -20,9 +22,9 @@ class ManipulatorStateObject:
 
         self._motor_state: np.ndarray = np.zeros(6, dtype=np.float64)    # Motor coordinates, radians
         self._joint_state: np.ndarray = np.zeros(6, dtype=np.float64)    # Joint coordinates, radians
-        self._ops_state: Pose = Pose.identity()                                 # 6D operational space posture
+        self._ops_state: Pose = Pose.identity()                                # 6D operational space posture
         self._jacobian: np.ndarray = np.zeros(6)
-
+        self._link_poses: List[Pose] = []
         self._sing_vals_translation: np.ndarray = np.zeros(3, dtype=np.float64)
         self._sing_vecs_translation: np.ndarray = np.zeros((3, 3), dtype=np.float64)
         self._sing_vals_rotation: np.ndarray = np.zeros(3, dtype=np.float64)
@@ -44,6 +46,10 @@ class ManipulatorStateObject:
         return self._ops_state.copy()
 
     @property
+    def link_poses(self) -> List[Pose]:
+        return self._link_poses
+
+    @property
     def jacobian(self) -> np.ndarray:
         return self._jacobian.copy()
 
@@ -61,8 +67,8 @@ class ManipulatorStateObject:
         self._motor_state = mot_vec.copy()
         jnt_vec = self._kinematics.mot2jnt(mot_vec)
         self._joint_state = jnt_vec
-        self._ops_state = self._kinematics.forward(jnt_vec)
-
+        self._link_poses = self._kinematics.forward(jnt_vec)
+        self._ops_state = self._link_poses[-1]
         self._jacobian = self._kinematics.jacobian(jnt_vec)
 
         # Singular values and vectors
