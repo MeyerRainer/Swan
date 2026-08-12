@@ -247,6 +247,10 @@ class SceneGraph(QAbstractItemModel):
         self.endRemoveRows()
         return True
 
+    def update(self):
+        # TODO
+        pass
+
     # --- Drag & Drop Support (Reordering / Moving Nodes) ---
     @override
     def supportedDropActions(self) -> Qt.DropAction:
