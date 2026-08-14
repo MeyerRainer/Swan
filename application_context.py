@@ -40,4 +40,7 @@ class ApplicationContext:
         # =========================================== Serial =============================================
 
     def update_status(self, status, m_pos, delta_t) -> dict:
-        return self.robot_sys.update_status(status, m_pos, delta_t)
+        status_dict: dict = self.robot_sys.update_status(status, m_pos, delta_t)
+        self.scene.update()
+
+        return status_dict

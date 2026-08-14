@@ -2,6 +2,7 @@
 
 Author: Rainer Meyer, rot.meyer494@gmail.com
 """
+import config
 from backend.manipulator import Manipulator
 from backend.linear_axis import LinearAxis
 from backend.g_code_writer import GCodeWriter
@@ -36,41 +37,38 @@ class RobotSystem(QObject):
 
         self.sys_state: SystemState = SystemState(self._manipulator.state, self._linear_axis.state)
 
-    def move_lin_7d(self, end_pose: Pose, stepping_rate: float = 1e-4) -> bool:
-        """ Numerical inverse kinematics to solve 7 joints for given pose and an additional criteria
-        @param pose: Desired end posture
-        @param criteria: Additional criteria for specific joint solution
-        """
-
-        # pos_error: float  = current_pose.distance(end_pose)
-        # ang_error: float = current_pose.quaternion.angle(end_pose.quaternion)
-
-        converge = False
-        iters = 0
-        while not converge and iters < 1000:
-            current_pose: Pose = self.sys_state.queued_pose
-            if current_pose.distance(end_pose) < 0.001:  # 1mm
-                return True
-            trans_dir: np.ndarray = current_pose.translation_direction(end_pose)
-            rot_dir: np.ndarray = current_pose.rotation_direction(end_pose)
-            dx: np.ndarray = stepping_rate * np.hstack((trans_dir, rot_dir)).T  # 6-vector
-
-            # Fetch jacobian and do pseudo inverse
-            J = self.sys_state.queued_jacobian
-            J_pinv = LA.pinv(J)
-            dq = J_pinv @ dx
-            jnt_vec = self.sys_state.queue_motors
-            jnt_vec[:7] += dq
-            self.sys_motor_move(jnt_vec)
-            iters += 1
-
-        return True
+    # def move_lin_7d(self, end_pose: Pose, stepping_rate: float = 1e-4) -> bool:
+    #     """ Numerical inverse kinematics to solve 7 joints for given pose and an additional criteria
+    #     @param pose: Desired end posture
+    #     @param criteria: Additional criteria for specific joint solution
+    #     """
+    #
+    #     # pos_error: float  = current_pose.distance(end_pose)
+    #     # ang_error: float = current_pose.quaternion.angle(end_pose.quaternion)
+    #
+    #     converge = False
+    #     iters = 0
+    #     while not converge and iters < 1000:
+    #         current_pose: Pose = self.sys_state.queued_pose
+    #         if current_pose.distance(end_pose) < 0.001:  # 1mm
+    #             return True
+    #         trans_dir: np.ndarray = current_pose.translation_direction(end_pose)
+    #         rot_dir: np.ndarray = current_pose.rotation_direction(end_pose)
+    #         dx: np.ndarray = stepping_rate * np.hstack((trans_dir, rot_dir)).T  # 6-vector
+    #
+    #         # Fetch jacobian and do pseudo inverse
+    #         J = self.sys_state.queued_jacobian
+    #         J_pinv = LA.pinv(J)
+    #         dq = J_pinv @ dx
+    #         jnt_vec = self.sys_state.queued_motors
+    #         jnt_vec[:7] += dq
+    #         self.sys_motor_move(jnt_vec)
+    #         iters += 1
+    #
+    #     return True
 
     def move_null(self, null_vec: np.ndarray, criteria) -> bool:
         ...
-
-
-
         # quat_err = utils.quat_multiply(quat_desired, quat_current.inv)
         # Quaternion error to rotation vector (for small errors only)
         # rot_vec = 2 * quat_err[1:]  # Small angle approximation
@@ -108,25 +106,25 @@ class RobotSystem(QObject):
         @:param speed: Motion speed in rad/s
         @:return: True if move sent to queue
         """
-        # sys_mot_vec_queued: np.ndarray = self.get_queue_motor()  # Current queued motor position vector. Degrees and millimeters.
-        sys_mot_vec_queued: np.ndarray = self.sys_state.queue_motors  # Current queued motor position vector. Degrees and millimeters.
+        # Current queued motor position vector. Degrees and millimeters.
+        sys_mot_vec_queued_ctrl_units: np.ndarray = self.sys_state.queued.motor_state_ctrl_units
 
         # Construct absolute target vector
-        sys_mot_vec_target = sys_mot_vec_queued.copy()
+        sys_mot_vec_target_ctrl_units = sys_mot_vec_queued_ctrl_units.copy()
         if incremental:  # Add
             if mot_vec_manipulator is not None:
-                sys_mot_vec_target[:6] += np.rad2deg(mot_vec_manipulator[:6].copy())
+                sys_mot_vec_target_ctrl_units[:6] += np.rad2deg(mot_vec_manipulator[:6].copy())
             if mot_vec_linear_axis is not None:
-                sys_mot_vec_target[6:7] += 1000 * mot_vec_linear_axis.copy()
+                sys_mot_vec_target_ctrl_units[6:7] += 1000 * mot_vec_linear_axis.copy()
 
         else:  # Override
             if mot_vec_manipulator is not None:
-                sys_mot_vec_target[:6] = np.rad2deg(mot_vec_manipulator.copy())  # Target position in degrees
+                sys_mot_vec_target_ctrl_units[:6] = np.rad2deg(mot_vec_manipulator.copy())  # Target position in degrees
             if mot_vec_linear_axis is not None:
-                sys_mot_vec_target[6:7] = 1000 * mot_vec_linear_axis.copy()  # Target position in millimeters
+                sys_mot_vec_target_ctrl_units[6:7] = 1000 * mot_vec_linear_axis.copy()  # Target position in millimeters
 
         # Normalized direction vector
-        delta_mot_vec = sys_mot_vec_target - sys_mot_vec_queued
+        delta_mot_vec = sys_mot_vec_target_ctrl_units - sys_mot_vec_queued_ctrl_units
         delta_mot_vec_norm = LA.norm(delta_mot_vec)
         dir_vec = delta_mot_vec / delta_mot_vec_norm
 
@@ -141,19 +139,18 @@ class RobotSystem(QObject):
 
         # Scale down speeds such that no motor exceeds its maximum speed
         mot_dir_vec = np.abs(dir_vec)
-        for idx in range(8):
+        for idx in range(len(config.MOTOR_MAX_SPEED)):
             if mot_dir_vec[idx] > 1e6:  # Avoid near zero denominator
-                feedrate = min(MOTOR_MAX_SPEED[f"M{idx+1}"] / mot_dir_vec[idx], feedrate)
-
-        # Set queued state
-        self._manipulator.state.queued.motor_state = np.deg2rad(sys_mot_vec_target[:6])
+                feedrate = min(config.MOTOR_MAX_SPEED[f"M{idx+1}"] / mot_dir_vec[idx], feedrate)
 
         # Write G-code for motor motion and send to serial queue.
-        g_code = self.gc_writer.move(x=float(sys_mot_vec_target[0]), y=float(sys_mot_vec_target[1]),
-                                            z=float(sys_mot_vec_target[2]), a=float(sys_mot_vec_target[3]),
-                                            b=float(sys_mot_vec_target[4]), c=float(sys_mot_vec_target[5]),
-                                            u=float(sys_mot_vec_target[6]), v=float(sys_mot_vec_target[7]),
+        g_code = self.gc_writer.move(x=float(sys_mot_vec_target_ctrl_units[0]), y=float(sys_mot_vec_target_ctrl_units[1]),
+                                            z=float(sys_mot_vec_target_ctrl_units[2]), a=float(sys_mot_vec_target_ctrl_units[3]),
+                                            b=float(sys_mot_vec_target_ctrl_units[4]), c=float(sys_mot_vec_target_ctrl_units[5]),
+                                            u=float(sys_mot_vec_target_ctrl_units[6]), v=float(sys_mot_vec_target_ctrl_units[7]),
                                             feedrate=feedrate, rapid=False)
+
+        self.sys_state.queued.motor_state_ctrl_units = sys_mot_vec_target_ctrl_units
         self.g_code_generated.emit(g_code)
         # print(f"write_g_code: {g_code}")
 
@@ -290,7 +287,7 @@ class RobotSystem(QObject):
         jnt_vec_deg[6:7] = 1000 * self._linear_axis.state.mcu.joint_state
 
         # delta_t = 0.1
-        alpha = 0.9
+        alpha = 0.95
         delta_x = LA.norm(tool_wrt_base.position - self.previous_pose.position)
         speed_linear: float = alpha*utils.m_s2mm_min(delta_x / delta_t) + (1-alpha)*self.speed_linear_prev
         speed_angular: float = alpha*utils.rad_sec2deg_min(abs(tool_wrt_base.quaternion.angle(self.previous_pose.quaternion)) / delta_t) + (1-alpha)*self.speed_angular_prev

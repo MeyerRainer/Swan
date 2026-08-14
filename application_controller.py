@@ -19,10 +19,8 @@ class ApplicationController(QObject):
         self.main_window = main_window              # GUI
         self.app_context = application_context      # Application state
 
-        self._time_s = time.monotonic()
-
         # self.app_context.program
-
+        self.millis: int = 0
         # Initialize
         self.connect_signals()
 
@@ -75,6 +73,7 @@ class ApplicationController(QObject):
         # GUI -> Context
         # Context -> GUI
         self.app_context.serial.connected.connect(self.main_window.toolbar.on_connect)
+        self.app_context.serial.connected.connect(self.app_context.robot_sys.reset)
         self.app_context.serial.disconnected.connect(self.main_window.toolbar.on_disconnect)
         self.app_context.serial.serial_connect.connect(self.main_window.toolbar.on_serial_toggle)
         self.app_context.serial.ports_refreshed.connect(self.main_window.toolbar.display_ports)
@@ -159,14 +158,12 @@ class ApplicationController(QObject):
         """ Upon receiving status from GRBL, update complete system status
         @param grbl_status_str: str, GRBL-styled status message
         """
-        # TODO: Add time stamp to GRBL realtime report.
-        time_s: float = time.monotonic()
-        delta_t = time_s - self._time_s
-        self._time_s = time_s
 
         # Parse MCU status.
-        status, m_pos, w_pos = utils.parse_grbl_status(grbl_status_str)
-
+        status, m_pos, t = utils.parse_grbl_status(grbl_status_str)
+        delta_t = 0.001*(t - self.millis)
+        self.millis = t
+        # print(f"App controller: t={0.001*t}, delta_t={delta_t}")
         # Update app context and main window.
         status_dict: dict = self.app_context.update_status(status, m_pos, delta_t)
         self.main_window.update_status(status_dict)

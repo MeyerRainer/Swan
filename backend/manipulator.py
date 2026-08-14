@@ -62,7 +62,7 @@ class Manipulator:
         mot_vec_deg = np.rad2deg(mot_vec)
         for idx in range(N_REV_JNT):
             if not MOTOR_LIMITS[f"M{idx+1}_MIN"] <= mot_vec_deg[idx] <= MOTOR_LIMITS[f"M{idx+1}_MAX"]:
-                print(f"Revolute motor value out of range")
+                print(f"Revolute motor {idx+1} out of range with value of {mot_vec_deg[idx]} degrees.")
                 return None
 
         return mot_vec.copy()

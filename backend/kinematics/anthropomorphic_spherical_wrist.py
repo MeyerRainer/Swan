@@ -105,6 +105,7 @@ class ASWKinematics:
         # DH-parameters, manipulator dimension constants
         a1, a2, a3 = self.DH[0]['a'], self.DH[1]['a'], self.DH[2]['a']
         d1, d4, d6 = self.DH[0]['d'], self.DH[3]['d'], self.DH[5]['d']
+        # print(f"IK: Requested pose: {target_pose}")
 
         # Because we have elbow offset(a3), we need the distance and angle
         # of the virtual d4 vector from J3 axis to spherical wrist
@@ -185,6 +186,7 @@ class ASWKinematics:
         # Check wrist joints solutions and prefer the solution with less distance in joint space.
         wrist_solutions = [wrist_sol_1, wrist_sol_2]
         wrist_solutions.sort(key=lambda x: np.linalg.norm(x-prev_jnt_vec[3:6]))
+        theta4, theta5, theta6 = 0., 0., 0.
         error = None
         for sol in wrist_solutions:
             theta4 = sol[0]
@@ -201,7 +203,7 @@ class ASWKinematics:
                 continue
             if error is None:
                 break
-
+        # print(f"IK solution: {np.rad2deg(np.array((theta1, theta2, theta3, theta4, theta5, theta6)))} degrees.")
         if error is not None:
             return None, error
 

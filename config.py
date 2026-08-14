@@ -5,6 +5,8 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 
 import math
+from typing import List
+
 import numpy as np
 
 # Linear base DOF's
@@ -12,6 +14,7 @@ LINEAR_AXIS = ['X']
 
 N_REV_JNT = 6
 N_LIN_JNT = len(LINEAR_AXIS)
+N_JNT = N_REV_JNT + N_LIN_JNT
 
 
 # Joint max angles (deg, mm)
@@ -91,13 +94,22 @@ DH_PARAMS = {
             'd4': np.float64(0.195),
             'd6': np.float64(0.0353)}
 
+DH_TABLE: List[dict] = [
+    {'a': np.float64(0.030), 'alpha': np.float64(math.pi/2),    'd': np.float64(0.130), 'nu_offset': np.float64(0.000)},
+    {'a': np.float64(0.160), 'alpha': np.float64(0.000),        'd': np.float64(0.000), 'nu_offset': np.float64(math.pi/2)},
+    {'a': np.float64(0.035), 'alpha': np.float64(math.pi/2),    'd': np.float64(0.000), 'nu_offset': np.float64(0.000)},
+    {'a': np.float64(0.000), 'alpha': np.float64(-math.pi/2),   'd': np.float64(0.195), 'nu_offset': np.float64(0.000)},
+    {'a': np.float64(0.000), 'alpha': np.float64(math.pi/2),    'd': np.float64(0.000), 'nu_offset': np.float64(0.000)},
+    {'a': np.float64(0.000), 'alpha': np.float64(0.000),        'd': np.float64(0.0353), 'nu_offset': np.float64(0.000)},
+]
+
 CHAR_LEN = np.float64(0.2)  # Characteristic length, m
 
 # Tool frame respect to J6 frame
 TOOL_OFS = np.array([
     [1., 0., 0., 0.000],
     [0., 1., 0., 0.000],
-    [0., 0., 1., 0.035],
+    [0., 0., 1., 0.000],
     [0., 0., 0., 1.000]], dtype=np.float64)
 # TOOL_OFS[:3, :3] = utils.zyz2rot_mat(np.array([0, -math.pi/4, 0]), dtype=np.float64)
 
@@ -121,8 +133,17 @@ ANGULAR_INCREMENT: int = 10  # deg
 JOINT_INCREMENT_SCROLL: int = 1  # deg
 JOINT_INCREMENT_ARROW_KEY: int = 5  # deg
 
+SPRING_MOUNT_DIMENSIONS = {
+    "MAIN_BOTTOM": 0.040,
+    "MAIN_TOP": 0.025,
+}
 
+
+# TODO: Move somewhere else.
 # Reductions (For reference only):
 # J1: Planetary: 5:1        Belt: 96:15 = 6.4:1     Total: 32:1
 # J2-J6: 30:1
 # J7: 8mm / rev
+
+# Default height: d1 + a2 + a3 = 0.325
+# Default length: a1 + d4 + d6 <=> 0.30+0.190+0.030=0.250
