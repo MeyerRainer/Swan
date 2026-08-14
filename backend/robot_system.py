@@ -21,6 +21,7 @@ class RobotSystem(QObject):
 
     g_code_generated = pyqtSignal(str)
     send_terminal = pyqtSignal(str)
+    sgn_speed_throttled = pyqtSignal(float)
 
     def __init__(self):
 
@@ -138,10 +139,14 @@ class RobotSystem(QObject):
             return False
 
         # Scale down speeds such that no motor exceeds its maximum speed
+        feedrate_throttle_factor: float = 1.
         mot_dir_vec = np.abs(dir_vec)
         for idx in range(len(config.MOTOR_MAX_SPEED)):
             if mot_dir_vec[idx] > 1e6:  # Avoid near zero denominator
-                feedrate = min(config.MOTOR_MAX_SPEED[f"M{idx+1}"] / mot_dir_vec[idx], feedrate)
+                feedrate_throttled = min(config.MOTOR_MAX_SPEED[f"M{idx+1}"] / mot_dir_vec[idx], feedrate)
+                feedrate_throttle_factor = min(feedrate_throttle_factor, feedrate_throttled / feedrate)
+                feedrate = feedrate_throttled
+        self.sgn_speed_throttled.emit(feedrate_throttle_factor)
 
         # Write G-code for motor motion and send to serial queue.
         g_code = self.gc_writer.move(x=float(sys_mot_vec_target_ctrl_units[0]), y=float(sys_mot_vec_target_ctrl_units[1]),
@@ -182,6 +187,10 @@ class RobotSystem(QObject):
         Numerical inverse kinematics
         """
         # q_dot = J^-1 * x_dot
+
+    def move_ops_lin_6d(self, target_pose: np.ndarray, speed_linear: float = None, speed_angular: float = None):
+        # ret = self._manipulator.move_ops_lin(target_pose=target_pose, )
+        ...
 
 
     def translate_tool(self, direction_vec: tuple[int, int, int], distance: float, speed: float, frame: str) -> bool:

@@ -2,6 +2,8 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
+from dataclasses import dataclass
+
 import config
 from config import *
 from robot_math.pose import Pose
@@ -15,6 +17,55 @@ import numpy as np
 from numpy import linalg as LA
 
 np.set_printoptions(precision=3, suppress=True)
+
+class JointSolution(Enum):
+    SUCCESS = auto()
+    J1_NEGATIVE_LIMIT = auto()
+    J1_POSITIVE_LIMIT = auto()
+    J2_NEGATIVE_LIMIT = auto()
+    J2_POSITIVE_LIMIT = auto()
+    J3_NEGATIVE_LIMIT = auto()
+    J3_POSITIVE_LIMIT = auto()
+    J4_NEGATIVE_LIMIT = auto()
+    J4_POSITIVE_LIMIT = auto()
+    J5_NEGATIVE_LIMIT = auto()
+    J5_POSITIVE_LIMIT = auto()
+    J6_NEGATIVE_LIMIT = auto()
+    J6_POSITIVE_LIMIT = auto()
+
+
+class MotorSolution(Enum):
+    SUCCESS = auto()
+    M1_NEGATIVE_LIMIT = auto()
+    M1_POSITIVE_LIMIT = auto()
+    M2_NEGATIVE_LIMIT = auto()
+    M2_POSITIVE_LIMIT = auto()
+    M3_NEGATIVE_LIMIT = auto()
+    M3_POSITIVE_LIMIT = auto()
+    M4_NEGATIVE_LIMIT = auto()
+    M4_POSITIVE_LIMIT = auto()
+    M5_NEGATIVE_LIMIT = auto()
+    M5_POSITIVE_LIMIT = auto()
+    M6_NEGATIVE_LIMIT = auto()
+    M6_POSITIVE_LIMIT = auto()
+
+
+
+@dataclass
+class MotionQueryResponse:
+    """ Manipulators response to a motion query, can result in:
+    -Inverse kinematics fail (point out of reach)
+    -Joint value out of range
+    -Motor value out of range
+
+    """
+    motion_accepted: bool
+    ik_solution: IkSolution         #
+    joint_solution: JointSolution   # Which joint out of range
+    motor_solution: MotorSolution   # Which motor out of range
+    motor_vector: np.ndarray        # New values for motors
+    # joint_vector: np.ndarray
+    # tool_pose: Pose
 
 
 class Manipulator:
@@ -52,7 +103,7 @@ class Manipulator:
         return condition_vec
 
     @staticmethod
-    def _move_mot(mot_vec: np.ndarray) -> np.ndarray | None:
+    def _move_mot(mot_vec: np.ndarray) -> MotionQueryResponse:
         """ Execute movement in motor space
         @param mot_vec: 6-vector of absolute motor coordinates in radians.
         @return: Same vector back if accepted, None otherwise
@@ -108,22 +159,21 @@ class Manipulator:
             jnt_pos_absolute = np.deg2rad(jnt_pos_absolute)
         return self._move_jnt(jnt_pos_absolute)
 
-    # TODO: Fix this
-    # def move_ops(self, target: Pose, shoulder_flip: bool = False, elbow_down: bool = False, wrist_flip: bool = False) -> np.ndarray | None:
+    # def move_ops(self, target_pose: Pose, speed_linear: float = None, speed_angular: float = None) -> Tuple[np.ndarray, float] | None:
     #     """ Motor space interpolated motion to given posture.
-    #     :param target:
-    #     :param elbow_down: Bool, for i_kin to choose a specific solution
-    #     :param shoulder_flip: Bool, for i_kin to choose a specific solution
-    #     :param wrist_flip: Bool, for i_kin to choose a specific solution
-    #     :return: True if motion was executed
+    #     :param speed_angular:
+    #     :param speed_linear:
+    #     :param target_pose:
+    #     :return: Motor vector if success, None otherwise.
     #     """
     #
     #     # Move too short
-    #     # TODO: Necessary?
-    #     if self.state.queued.ops_state.is_close(target):
+    #     if self.state.queued.ops_state.is_close(target_pose):
     #         return None
     #
-    #     target_jnt_vec, ik_sol = self.kinematics.inverse(target, prev_jnt_vec=self.state.queued.joint_state, shoulder_flip=shoulder_flip, elbow_down=elbow_down, wrist_flip=wrist_flip)
+    #     jnt_vec, ik_sol = self.kinematics.inverse(target_pose, prev_jnt_vec=self.state.queued.joint_state)
+    #     if ik_sol != IkSolution.SUCCESS:
+    #
     #
     #     # TODO: Instead of returning None, return some datastructures that includes IK_SOLUTION
     #     if ik_sol != IK_SOLUTION["SUCCESS"]:
@@ -176,11 +226,11 @@ class Manipulator:
         for idx in range(n_segments):
             t = (1+idx) / n_segments  # Interpolation parameter in range [0, 1]
             interp_pose = current_pose.interpolate(target_pose, t)
-            interp_jnt_vec, ik_sol = self.kinematics.inverse(interp_pose, prev_jnt_vec=current_jnt_vec)
-            if ik_sol != IkSolution.SUCCESS:
+            ik_sol: IkSolution = self.kinematics.inverse(interp_pose, prev_jnt_vec=current_jnt_vec)
+            if not ik_sol.success:
                 print(f"move_ops_lin: IK fail: {ik_sol}")
                 return None
-
+            interp_jnt_vec = ik_sol.joint_solution
             current_jnt_vec = interp_jnt_vec.copy()
 
             # Propagate motion command forwards

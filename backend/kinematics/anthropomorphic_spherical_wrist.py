@@ -3,6 +3,7 @@ Based on the book: L.Sciavicco and B.Siciliano, Modelling and Control of Robot M
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
+from dataclasses import dataclass, field
 from enum import Enum, auto
 import numpy as np
 
@@ -10,22 +11,41 @@ from config import *
 import config
 import utils
 from robot_math.pose import Pose
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Literal, Any
 
 
-class IkSolution(Enum):
-    SUCCESS = auto()
+class Singularity(Enum):
+    NO_SINGULARITY = auto()
+    SHOULDER_SINGULARITY =  auto()
+    ELBOW_SINGULARITY =  auto()
+    WRIST_SINGULARITY =  auto()
+    WRIST_FLIPPED =  auto()
+
+class JointLimit(Enum):
+    CLEAR = auto()
     J1_LIMIT = auto()
     J2_LIMIT = auto()
     J3_LIMIT = auto()
     J4_LIMIT = auto()
     J5_LIMIT = auto()
     J6_LIMIT = auto()
-    SHOULDER_SINGULARITY =  auto()
-    ELBOW_SINGULARITY =  auto()
-    WRIST_SINGULARITY =  auto()
-    WRIST_FLIPPED =  auto()
 
+
+@dataclass
+class IkSolution:
+    singularity: Singularity = Singularity.NO_SINGULARITY
+    joint_limits: JointLimit = JointLimit.CLEAR
+    joint_solution: np.ndarray = field(default_factory=np.zeros(6, dtype=np.float64))
+    success: bool = False
+
+@dataclass
+class IkParams:
+    wrist_lefty: bool
+    wrist_righty: bool
+    shoulder_lefty: bool
+    shoulder_righty: bool
+    elbow_up: bool
+    elbow_down: bool
 
 class ASWKinematics:
 
@@ -83,16 +103,16 @@ class ASWKinematics:
             ])
             # Append new composite pose representing link i w.r.t. base.
             link_i_wrt_base: np.ndarray = T_previous @ T
-            link_poses.append(Pose.from_SE3(link_i_wrt_base))
+            link_poses.append(Pose(SE3=link_i_wrt_base))
             T_previous = link_i_wrt_base
 
         # Add tool transformation.
-        link_poses.append(Pose.from_SE3(link_poses[-1].SE3 @ config.TOOL_OFS))
+        link_poses.append(Pose(SE3=link_poses[-1].SE3 @ config.TOOL_OFS))
 
         return link_poses
 
     def inverse(self, target_pose: Pose, prev_jnt_vec: np.ndarray, shoulder_flip: bool = False,
-               elbow_down: bool = False, wrist_flip: bool = False, jnt_correction=False) -> Tuple[Optional[np.ndarray], IkSolution]:
+               elbow_down: bool = False, wrist_flip: bool = False, jnt_correction=False) -> IkSolution:
         """ Inverse kinematics. Operational space -> joint space, if solution exists.
         :param target_pose: 6D Pose object.
         :param prev_jnt_vec: Previous solution used in case of singularity.
@@ -127,7 +147,7 @@ class ASWKinematics:
         else:
             theta1 = np.atan2(wy, wx)
         if not JOINT_LIMITS['J1_MIN'] <= np.rad2deg(theta1) <= JOINT_LIMITS['J1_MAX']:
-            return None, IkSolution.J1_LIMIT
+            return IkSolution(joint_limits=JointLimit.J1_LIMIT)
 
         # Shift spherical wrist location closer to accounting for d1 and a1 offsets.
         c1, s1 = np.cos(theta1), np.sin(theta1)
@@ -140,7 +160,8 @@ class ASWKinematics:
         cos_theta3 = (base2wrist_sqr - a2 * a2 - elbow2wrist * elbow2wrist) / (2.0 * a2 * elbow2wrist)
         # Point out of reach. No solution.
         if cos_theta3 < -1 or cos_theta3 > 1:
-            return None, IkSolution.ELBOW_SINGULARITY
+            return IkSolution(singularity=Singularity.ELBOW_SINGULARITY)
+
         if elbow_down:
             sin_theta3 = np.sqrt(1 - cos_theta3 * cos_theta3)
         else:
@@ -152,7 +173,7 @@ class ASWKinematics:
         theta3 += np.pi/2  # Custom zero offset.
         theta3 -= th3off  # Angle offset caused by DH-parameter "a3".
         if not JOINT_LIMITS['J3_MIN'] <= np.rad2deg(theta3) <= JOINT_LIMITS['J3_MAX']:
-            return None, IkSolution.J3_LIMIT
+            return IkSolution(joint_limits=JointLimit.J3_LIMIT)
 
         # Solve Joint 2 and check limit.
         cos_theta2 = ((a2 + elbow2wrist * cos_theta3) * np.sqrt(wx * wx + wy * wy) + elbow2wrist * sin_theta3 * wz) / base2wrist_sqr
@@ -163,7 +184,7 @@ class ASWKinematics:
             theta2 = np.atan2(sin_theta2, cos_theta2)
         theta2 -= np.pi/2  # Custom zero offset.
         if not JOINT_LIMITS['J2_MIN'] <= np.rad2deg(theta2) <= JOINT_LIMITS['J2_MAX']:
-            return None, IkSolution.J2_LIMIT
+            return IkSolution(joint_limits=JointLimit.J2_LIMIT)
 
         # Spherical wrists: Solve Joints 4-6. Compute orientation resulting from joints 1-3.
         # and subtract that from desired end effector orientation.
@@ -187,27 +208,30 @@ class ASWKinematics:
         wrist_solutions = [wrist_sol_1, wrist_sol_2]
         wrist_solutions.sort(key=lambda x: np.linalg.norm(x-prev_jnt_vec[3:6]))
         theta4, theta5, theta6 = 0., 0., 0.
-        error = None
+        limit_trigger = JointLimit.CLEAR
         for sol in wrist_solutions:
             theta4 = sol[0]
             if not JOINT_LIMITS['J4_MIN'] <= np.rad2deg(theta4) <= JOINT_LIMITS['J4_MAX']:
-                error = IkSolution.J4_LIMIT
+                limit_trigger = JointLimit.J4_LIMIT
                 continue
             theta5 = sol[1]
             if not JOINT_LIMITS['J5_MIN'] <= np.rad2deg(theta5) <= JOINT_LIMITS['J5_MAX']:
-                error = IkSolution.J5_LIMIT
+                limit_trigger = JointLimit.J5_LIMIT
                 continue
             theta6 = sol[2]
             if not JOINT_LIMITS['J6_MIN'] <= np.rad2deg(theta6) <= JOINT_LIMITS['J6_MAX']:
-                error = IkSolution.J6_LIMIT
+                limit_trigger = JointLimit.J6_LIMIT
                 continue
-            if error is None:
+            if limit_trigger is JointLimit.CLEAR:
                 break
-        # print(f"IK solution: {np.rad2deg(np.array((theta1, theta2, theta3, theta4, theta5, theta6)))} degrees.")
-        if error is not None:
-            return None, error
 
-        return np.array((theta1, theta2, theta3, theta4, theta5, theta6)), IkSolution.SUCCESS
+        # print(f"IK solution: {np.rad2deg(np.array((theta1, theta2, theta3, theta4, theta5, theta6)))} degrees.")
+        if limit_trigger is not JointLimit.CLEAR:
+            return IkSolution(joint_limits=limit_trigger)
+
+        return IkSolution(joint_solution=np.array([theta1, theta2, theta3, theta4, theta5, theta6]), success=True)
+
+
 
     def jacobian(self, jnt_vec: np.ndarray):
         """ Computes the 6x6 Jacobian matrix between motor space and operational space.
@@ -336,3 +360,9 @@ class ASWKinematics:
         J = np.zeros((6, 24))
 
         return J
+
+    def get_machine_constants(self):
+        # DH-parameters, manipulator dimension constants
+        a1, a2, a3 = self.DH[0]['a'], self.DH[1]['a'], self.DH[2]['a']
+        d1, d4, d6 = self.DH[0]['d'], self.DH[3]['d'], self.DH[5]['d']
+        return a1, a2, a3, d1, d4, d6
