@@ -53,46 +53,49 @@ class Pose:
         return cls(SE3)
 
     @classmethod
-    def from_SE3(cls, T: np.ndarray) -> Pose:
-        return cls(T)
+    def from_rot_mat(cls, pos: np.ndarray, R: np.ndarray) -> Pose:
+        SE3 = np.eye(3, dtype=np.float64)
+        SE3[:3, 3] = pos
+        SE3[:3, :3] = R
+        return cls(SE3)
 
     # ======================================== Getters =======================================
     @property
-    def position(self):
+    def position(self) -> np.ndarray:
         return self.pose[:3, 3]
 
     @property
-    def quaternion(self):
+    def quaternion(self) -> Quaternion:
         return Quaternion.from_rotation_matrix(self.pose[:3, :3])
 
     @property
-    def rot_mat(self):
+    def rot_mat(self) -> np.ndarray:
         return self.pose[:3, :3]
 
     @property
-    def zyz_euler(self):
+    def zyz_euler(self) -> np.ndarray:
         return utils.rot2zyz(self.pose[:3, :3])[0]
 
     @property
-    def SE3(self):
+    def SE3(self) -> np.ndarray:
         return self.pose.copy()
 
     # ======================================== Setters =======================================
     # Set position.
     @position.setter
-    def position(self, pos):
+    def position(self, pos) -> None:
         if pos.shape != (3,):
             raise ValueError(f"Expected shape (3,), got {pos.shape} instead.")
         self.pose[:3, 3] = pos.copy()
 
     # Set orientation using quaternion.
     @quaternion.setter
-    def quaternion(self, quat: Quaternion):
+    def quaternion(self, quat: Quaternion) -> None:
         self.pose[:3, :3] = quat.to_rotation_matrix()
 
     # Set orientation using rotation matrix.
     @rot_mat.setter
-    def rot_mat(self, R: np.ndarray):
+    def rot_mat(self, R: np.ndarray) -> None:
         if R.shape != (3, 3):
             raise ValueError(f"Expected shape (3, 3), got {R.shape} instead.")
 
@@ -122,7 +125,7 @@ class Pose:
 
     # Set Orientation using ZYZ Euler angles.
     @zyz_euler.setter
-    def zyz_euler(self, zyz: np.ndarray):
+    def zyz_euler(self, zyz: np.ndarray) -> None:
         if zyz.shape != (3,):
             raise ValueError(f"Expected shape (3,), got {zyz.shape} instead.")
         self.pose[:3, :3] = utils.zyz2rot_mat(zyz)
@@ -136,7 +139,7 @@ class Pose:
 
     # ======================================== Spatial operations =======================================
     # Rotate around x.
-    def rotate_x(self, angle: float, degrees=False, body_frame=True):
+    def rotate_x(self, angle: float, degrees=False, body_frame=True) -> None:
         R = np.eye(3)
         if degrees:
             angle = np.deg2rad(angle)
@@ -148,7 +151,7 @@ class Pose:
             self.pose[:3, :3] = R @ self.pose[:3, :3]
 
     # Rotate around y.
-    def rotate_y(self, angle: float, degrees=False, body_frame=True):
+    def rotate_y(self, angle: float, degrees=False, body_frame=True) -> None:
         R = np.eye(3)
         if degrees:
             angle = np.deg2rad(angle)
@@ -160,7 +163,7 @@ class Pose:
             self.pose[:3, :3] = R @ self.pose[:3, :3]
 
     # Rotate around z.
-    def rotate_z(self, angle: float, degrees=False, body_frame=True):
+    def rotate_z(self, angle: float, degrees=False, body_frame=True) -> None:
         R = np.eye(3)
         if degrees:
             angle = np.deg2rad(angle)
@@ -170,6 +173,12 @@ class Pose:
             self.pose[:3, :3] = self.pose[:3, :3] @ R
         else:
             self.pose[:3, :3] = R @ self.pose[:3, :3]
+
+    # Rotate about arbitrary axis an angle.
+    def rotate_axis_angle(self, axis: np.ndarray, angle: float, degrees=False) -> None:
+        # TODO
+        ...
+
 
     # Return inverse of self.
     def inverse(self) -> Pose:
@@ -221,6 +230,22 @@ class Pose:
             raise TypeError(f"Expected type Pose, got {type(other)} instead.")
         inter_position = self.position + t * (other.position - self.position)
         inter_quaternion = self.quaternion.slerp(other.quaternion, t)
+        return Pose.from_quaternion(pos=inter_position, quat=inter_quaternion)
+
+    def arc_interpolate(self, end: Pose, arc_center: np.ndarray, arc_normal: np.ndarray, angle: float, t: float = 0.5) -> Pose:
+        """ Interpolates over arc
+        :param end: End Pose.
+        :param arc_center: Center point of arc.
+        :param arc_normal: Normalized rotation axis.
+        :param angle: Angle of rotation in radians.
+        :param t: Interpolation parameter in range [0, 1].
+        """
+        v: np.ndarray = self.position - arc_center  # Center -> start point vector.
+        theta: float = t * angle
+        cos_theta: float = np.cos(theta)
+        # Position by Rodrigues' formula:
+        inter_position = arc_center + v*cos_theta + np.cross(arc_normal, v)*np.sin(theta) + arc_normal*np.dot(arc_normal, v)*(1-cos_theta)
+        inter_quaternion: Quaternion = self.quaternion.slerp(end.quaternion, t=t)
         return Pose.from_quaternion(pos=inter_position, quat=inter_quaternion)
 
     def is_close(self, other: Pose) -> bool:
