@@ -11,31 +11,57 @@ class InstructionNode(ABC):
         self.line_no = line_no
 
     @abstractmethod
-    def execute(self, driver: Any) -> None:
-        """Executes the instruction directly on the physical hardware driver."""
+    def plan(self, planner: Any) -> None:
         pass
 
+
 @dataclass
-class MoveJNode(InstructionNode):
+class MoveJointNode(InstructionNode):
     target: Target
     lineno: int = -1
-
     def __init__(self, target: Target, speed: float, lineno: int):
-
         super().__init__()
+        self.target = target
+        self.speed = speed
+        self.lineno = lineno
+        print(f"MoveJoint initialized")
 
-        self._target = target
-        self._speed = speed
-        self._lineno = lineno
-        print(f"MoveJNode initialized")
+    def plan(self, planner: Any) -> None:
+        planner.process_instruction(self)
 
-    def execute(self, driver: Any) -> None:
-        print(f"[Driver] Executing MoveJ to {self._target.name} (Line {self.line_no})")
-        # Blocking motion command down to physical robot hardware/controller
-        driver.move_jnt(jnt_vec=self._target.joints, speed=self._speed, degrees=True)
 
 @dataclass
-class WaitNode(InstructionNode):
+class MoveCartesianLinearNode(InstructionNode):
+    target: Target
+    lineno: int = -1
+    def __init__(self, target: Target, speed: float, lineno: int):
+        super().__init__()
+        self.target = target
+        self.speed = speed
+        self.lineno = lineno
+        print(f"MoveCartesianLinear initialized")
+
+    def plan(self, planner):
+        planner.process_instruction(self)
+
+
+@dataclass
+class MoveCartesianJointNode(InstructionNode):
+    target: Target
+    lineno: int = -1
+    def __init__(self, target: Target, speed: float, lineno: int):
+        super().__init__()
+        self.target = target
+        self.speed = speed
+        self.lineno = lineno
+        print(f"MoveCartesianJoint initialized")
+
+    def plan(self, planner):
+        planner.process_instruction(self)
+
+
+@dataclass
+class WaitSecondsNode(InstructionNode):
     seconds: float
     line_no: int = -1
 
@@ -43,13 +69,16 @@ class WaitNode(InstructionNode):
         print(f"[Driver] Executing Wait({self.seconds}s)")
         driver.sleep(self.seconds)
 
+    def plan(self, planner: Any):
+        planner.process_instruction(self)
+
 
 # Root
-class BlockNode(InstructionNode):
+class ProgramRoot(InstructionNode):
     def __init__(self):
         super().__init__()
         self.children: List[InstructionNode] = []
 
-    def execute(self, driver: Any) -> None:
+    def plan(self, planner: Any) -> None:
         for child in self.children:
-            child.execute(driver)
+            child.plan(planner)

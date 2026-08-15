@@ -14,19 +14,20 @@ class ProgramManager(QObject):
     sgn_program_loaded = pyqtSignal(str, str)  # File name and contents.
     sgn_current_program_line = pyqtSignal(int)
 
-    def __init__(self, robot_sys: RobotSystem):
+    def __init__(self, planner: Any):
 
         super().__init__()
 
-        self.robot_driver: RobotSystem = robot_sys
+        self.planner: Any = planner
 
         # Program executor running on another worker thread.
         self.executor: Optional[ProgramExecutor] = None
         self.program_file_path: Optional[str] = None
 
         # Internal program structure. (Tree)
-        self.program: Optional[BlockNode] = None
+        self.program: Optional[ProgramRoot] = None
         self.targets = Dict[str, Target]
+        self.program_running: bool = False
 
     def load_program(self, file_name: str, file_extension: str) -> bool:
         self.program_file_path = file_name + file_extension
@@ -45,17 +46,9 @@ class ProgramManager(QObject):
     # Run internal program.
     def on_run(self):
         # Paused by default.
-        self.executor = ProgramExecutor(self.program, self.robot_driver)
+        self.executor = ProgramExecutor(self.program, self.planner)
         # Start executor thread.
         self.executor.start()
-
-    def on_pause(self):
-        if self.executor:
-            self.executor.pause()
-
-    def on_resume(self):
-        if self.executor:
-            self.executor.resume()
 
     def on_step(self):
         if self.executor:
@@ -64,6 +57,12 @@ class ProgramManager(QObject):
     def on_stop(self):
         if self.executor:
             self.executor.stop()
+
+    def on_pause_resume_toggle(self):
+        if self.program_running:
+            self.executor.pause()
+        else:
+            self.executor.resume()
 
     @staticmethod
     def _execute(file_path: str, context: ProgramContext) -> bool:

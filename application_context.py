@@ -21,8 +21,8 @@ class ApplicationContext:
         self.camera = CameraManager()
         self.vision = VisionManager()
         self.scene = SceneGraph(root=None, dir_path="scene/")
-        self.program_manager = ProgramManager(robot_sys=self.robot_sys)
         self.planner = TrajectoryPlanner()
+        self.program_manager = ProgramManager(planner=self.planner)
 
         # print(f"App context: Number of scene nodes: {self.scene.size()}")
 

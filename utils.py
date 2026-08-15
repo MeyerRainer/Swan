@@ -253,23 +253,42 @@ def quat_multiply(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
     q = np.array([w, x, y, z])
     return q / np.linalg.norm(q)
 
+# def parse_grbl_status(line: str):
+#     """ Parses GRBL status line
+#     @param line: GRBL status line
+#     @return: Tuple[str, list[float], list[float]]
+#     """
+#     s_match = re.search(r"<([a-zA-Z]+)", line)
+#     m_match = re.search(r"MPos:(.*?),WPos:", line)
+#     w_match = re.search(r"WPos:(.*?)>", line)
+#
+#     if s_match:
+#         status = s_match.group(1)
+#     else:
+#         status = "Parser error"
+#     m_pos = [float(x) for x in m_match.group(1).split(",")] if m_match else []
+#     w_pos = [float(x) for x in w_match.group(1).split(",")] if w_match else []
+#
+#     return status, m_pos, w_pos
+
 def parse_grbl_status(line: str):
     """ Parses GRBL status line
     @param line: GRBL status line
     @return: Tuple[str, list[float], list[float]]
     """
     s_match = re.search(r"<([a-zA-Z]+)", line)
-    m_match = re.search(r"MPos:(.*?),WPos:", line)
-    w_match = re.search(r"WPos:(.*?)>", line)
+    m_match = re.search(r"MPos:(.*?),t:", line)
+    t_match = re.search(r"t:(.*?)>", line)
 
     if s_match:
         status = s_match.group(1)
     else:
         status = "Parser error"
     m_pos = [float(x) for x in m_match.group(1).split(",")] if m_match else []
-    w_pos = [float(x) for x in w_match.group(1).split(",")] if w_match else []
+    t = t_match.group(1)
+    # print(f"RE:\n{status}\n{m_pos}\n{t}")
 
-    return status, m_pos, w_pos
+    return status, m_pos, int(t)
 
 def load_obj(file_path: str) -> Tuple[np.ndarray, np.ndarray]:
     # 1. Initialize Reader and Load File

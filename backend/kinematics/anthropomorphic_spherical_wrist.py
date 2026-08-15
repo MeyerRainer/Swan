@@ -53,7 +53,6 @@ class ASWKinematics:
 
         # Denavit-Hartenberg table.
         self.DH = DH
-        self.DH_old = config.DH_PARAMS
 
         # Trigonometric functions for kinematic calibration.
         self.sin_alpha = []

@@ -2,6 +2,7 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
+import time
 from dataclasses import dataclass
 
 import config
@@ -103,7 +104,7 @@ class Manipulator:
         return condition_vec
 
     @staticmethod
-    def _move_mot(mot_vec: np.ndarray) -> MotionQueryResponse:
+    def _move_mot(mot_vec: np.ndarray) -> Optional[np.ndarray]:
         """ Execute movement in motor space
         @param mot_vec: 6-vector of absolute motor coordinates in radians.
         @return: Same vector back if accepted, None otherwise
@@ -139,9 +140,6 @@ class Manipulator:
     # ------------------------------------ Public interface ---------------------------------------
     # ---------------------------------------------------------------------------------------------
 
-    def update_mcu_state(self, mot_vec: np.ndarray):
-        self.state.mcu.motor_state = mot_vec
-
     def reset(self):
         self.state.mcu.motor_state = np.zeros(N_REV_JNT)
         self.state.queued.motor_state = np.zeros(N_REV_JNT)
@@ -159,29 +157,29 @@ class Manipulator:
             jnt_pos_absolute = np.deg2rad(jnt_pos_absolute)
         return self._move_jnt(jnt_pos_absolute)
 
-    # def move_ops(self, target_pose: Pose, speed_linear: float = None, speed_angular: float = None) -> Tuple[np.ndarray, float] | None:
-    #     """ Motor space interpolated motion to given posture.
-    #     :param speed_angular:
-    #     :param speed_linear:
-    #     :param target_pose:
-    #     :return: Motor vector if success, None otherwise.
-    #     """
-    #
-    #     # Move too short
-    #     if self.state.queued.ops_state.is_close(target_pose):
-    #         return None
-    #
-    #     jnt_vec, ik_sol = self.kinematics.inverse(target_pose, prev_jnt_vec=self.state.queued.joint_state)
-    #     if ik_sol != IkSolution.SUCCESS:
-    #
-    #
-    #     # TODO: Instead of returning None, return some datastructures that includes IK_SOLUTION
-    #     if ik_sol != IK_SOLUTION["SUCCESS"]:
-    #         print(f"move_ops: IK fail: {ik_sol}")
-    #         return None
-    #
-    #     # Propagate motion request forwards
-    #     return self._move_jnt(target_jnt_vec)
+    def move_ops(self, target_pose: Pose) -> Optional[np.ndarray]:
+        """ Motor space interpolated motion to given posture.
+        :param target_pose:
+        :return:
+        """
+        # Move too short
+        if self.state.queued.ops_state.is_close(target_pose):
+            return None
+
+        current_jnt_vec: np.ndarray = self.state.queued.joint_state
+        ik_sol: IkSolution = self.kinematics.inverse(target_pose, prev_jnt_vec=current_jnt_vec)
+        if not ik_sol.success:
+            print(f"move_ops_lin: IK fail.")
+            return None
+        jnt_vec: np.ndarray = ik_sol.joint_solution
+
+        # Propagate motion command forwards
+            # Propagate motion command forwards
+        mot_vec = self._move_jnt(jnt_vec)
+        if mot_vec is None:
+            return None
+
+        return mot_vec
 
     def move_ops_lin(self, target_pose: Pose, speed_linear: float = None, speed_angular: float = None,
                      segment_length_m: float = 0.001, segment_size_rad: float = 0.0035) -> Tuple[np.ndarray, float] | None:
@@ -228,7 +226,7 @@ class Manipulator:
             interp_pose = current_pose.interpolate(target_pose, t)
             ik_sol: IkSolution = self.kinematics.inverse(interp_pose, prev_jnt_vec=current_jnt_vec)
             if not ik_sol.success:
-                print(f"move_ops_lin: IK fail: {ik_sol}")
+                print(f"move_ops_lin: IK fail.")
                 return None
             interp_jnt_vec = ik_sol.joint_solution
             current_jnt_vec = interp_jnt_vec.copy()
@@ -267,7 +265,11 @@ class Manipulator:
         end_pose.position += distance * unit_vec
 
         # Compute motor vector list for end and intermediate postures
-        return self.move_ops_lin(end_pose, speed_linear=speed)
+        start_time = time.perf_counter()
+        ret = self.move_ops_lin(end_pose, speed_linear=speed)
+        end_time = time.perf_counter()
+        print(f"Tralate tool execution time: {end_time-start_time:.6f} seconds")
+        return ret
 
     def rotate_tool(self, direction_vec: tuple[int, int, int], angle: float, speed: float, frame: str) -> np.ndarray | None:
         """ Creates a pure rotation around any axis in any frame.

@@ -16,6 +16,8 @@ import numpy as np
 import numpy.linalg as LA
 from PyQt6.QtCore import QObject, pyqtSignal
 
+from robot_math.quaternion import Quaternion
+
 
 class RobotSystem(QObject):
 
@@ -35,6 +37,8 @@ class RobotSystem(QObject):
         self.previous_pose: Pose = Pose.identity()
         self.speed_linear_prev = 0.
         self.speed_angular_prev = 0.
+
+        # self.executor = MotionExecutor()
 
         self.sys_state: SystemState = SystemState(self._manipulator.state, self._linear_axis.state)
 
@@ -182,16 +186,24 @@ class RobotSystem(QObject):
 
         return True
 
+    def move_ops(self, target_pose: Pose, time_seconds: float) -> bool:
+        """ Motor space interpolated motion to given posture.
+        :param target_pose:
+        :param time_seconds:
+        :return:
+        """
+        mot_vec = self._manipulator.move_ops(target_pose=target_pose)
+        if mot_vec is None:
+            return False
+
+        self.sys_motor_move(mot_vec_manipulator=mot_vec, time=time_seconds)
+        return True
+
     def move_ops_lin_7d(self, ops_vec: np.ndarray, time: float, criteria: int, incremental: bool = False) -> bool:
         """
         Numerical inverse kinematics
         """
         # q_dot = J^-1 * x_dot
-
-    def move_ops_lin_6d(self, target_pose: np.ndarray, speed_linear: float = None, speed_angular: float = None):
-        # ret = self._manipulator.move_ops_lin(target_pose=target_pose, )
-        ...
-
 
     def translate_tool(self, direction_vec: tuple[int, int, int], distance: float, speed: float, frame: str) -> bool:
         """ Creates a pure translation along any axis in any frame.
@@ -242,11 +254,11 @@ class RobotSystem(QObject):
         self._manipulator.reset()
 
     def toggle_feed_hold(self):
-        if self.sys_state.grbl == ControllerState.HOLD:
+        if self.sys_state.controller == ControllerState.HOLD:
             self.g_code_generated.emit(self.gc_writer.cycle_start())
-        elif self.sys_state.grbl == ControllerState.IDLE:
+        elif self.sys_state.controller == ControllerState.IDLE:
             self.g_code_generated.emit(self.gc_writer.cycle_start())
-        elif self.sys_state.grbl == ControllerState.CYCLE:
+        elif self.sys_state.controller == ControllerState.CYCLE:
             self.g_code_generated.emit(self.gc_writer.feed_hold())
 
     def update_status(self, status: str, mot_list: list, delta_t: float):
@@ -257,26 +269,26 @@ class RobotSystem(QObject):
         """
         match status:
             case "Idle":
-                self.sys_state.grbl = ControllerState.IDLE
+                self.sys_state.controller = ControllerState.IDLE
             case "Run":
-                self.sys_state.grbl = ControllerState.CYCLE
+                self.sys_state.controller = ControllerState.CYCLE
             case "Hold":
-                self.sys_state.grbl =  ControllerState.HOLD
+                self.sys_state.controller =  ControllerState.HOLD
             case "Home":
-                self.sys_state.grbl = ControllerState.HOMING
+                self.sys_state.controller = ControllerState.HOMING
             case "Alarm":
-                self.sys_state.grbl = ControllerState.ALARM
+                self.sys_state.controller = ControllerState.ALARM
             case "Check":
-                self.sys_state.grbl = ControllerState.CHECK
+                self.sys_state.controller = ControllerState.CHECK
             case "Door":
-                self.sys_state.grbl = ControllerState.SAFETY_DOOR
+                self.sys_state.controller = ControllerState.SAFETY_DOOR
 
         # Real motor values reported by controller
         mot_vec = np.array(mot_list)  # Degrees and millimeters
 
         # Update states
-        self._manipulator.update_mcu_state(np.deg2rad(mot_vec[:6]))  # 6 axis
-        self._linear_axis.update_mcu_state(0.001 * mot_vec[6:7])  # 1 axis
+        self._manipulator.state.mcu.motor_state =np.deg2rad(mot_vec[:N_REV_JNT])
+        self._linear_axis.state.mcu.joint_state =0.001 * mot_vec[N_REV_JNT:N_JNT]
 
         tool_wrt_base: Pose = self._manipulator.state.mcu.ops_state
         base_wrt_world = self._linear_axis.state.mcu.pose

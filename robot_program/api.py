@@ -16,9 +16,7 @@ def get_thread_context() -> Any:
     """Retrieves the active RobotContext bound to the current thread."""
     ctx = getattr(_thread_local, "active_context", None)
     if ctx is None:
-        raise RuntimeError(
-            "Robot API function called outside of an active ProgramManager execution context."
-        )
+        raise RuntimeError("Robot API function called outside of an active ProgramManager execution context.")
     return ctx
 
 
@@ -43,18 +41,42 @@ class Target:
 
     name: str = ""
     pose: Optional[Pose] = None      # Operational space
-    joints: Optional[np.ndarray] = None  # Joint space
-
     tool: str = "tool0"
     frame: str = "world"
     speed: float = 100.0
     zone: float = 0.0
 
-def MoveJ(target: Target, speed: float) -> None:
+def MoveJoint(target: Target, speed: float) -> None:
+    """ Move to joint coordinates.
+    :param target:
+    :param speed:
+    :return:
+    """
     lineno = get_caller_line_no()
     get_thread_context().move_j(target=target, speed=speed, lineno=lineno)
 
-def Wait(seconds: float) -> None:
+def MoveCartesianJoint(target: Target, speed: float) -> None:
+    """ Move to cartesian position by linearly interpolating in joint space.
+    (Results in difficult to predict path in cartesian space)
+    :param target:
+    :param speed:
+    :return:
+    """
+    lineno = get_caller_line_no()
+    get_thread_context().move_cartesian_linear(target=target, speed=speed, lineno=lineno)
+
+def MoveCartesianLinear(target: Target, speed: float) -> None:
+    """ Move to cartesian position by linearly interpolating in cartesian space.
+    (Results in straight line motion at constant linear and angular velocity, but
+    all points inbetween must be reachable)
+    :param target:
+    :param speed:
+    :return:
+    """
+    lineno = get_caller_line_no()
+    get_thread_context().move_cartesian_linear(target=target, speed=speed, lineno=lineno)
+
+def WaitSeconds(seconds: float) -> None:
     pass
 
 def DigitalIn(pin: int) -> bool:

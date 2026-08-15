@@ -15,12 +15,12 @@ class ProgramExecutor(QThread):
     sgn_instruction_changed = pyqtSignal(int)  # Emits current line_no to GUI
     sgn_finished = pyqtSignal()
 
-    def __init__(self, program_root: BlockNode, driver: Any):
+    def __init__(self, program_root: ProgramRoot, planner: Any):
 
         super().__init__()
 
         self.program_node = program_root
-        self.driver = driver
+        self.planner = planner
 
         self.current_index = 0
         self.state = ExecutionState.PAUSED
@@ -50,7 +50,6 @@ class ProgramExecutor(QThread):
         instructions = self.program_node.children
 
         while self.current_index < len(instructions) and not self._stop_requested:
-            print(f"While index: {self.current_index}")
             # Handle Pause / Step state waiting
             if self.state == ExecutionState.PAUSED:
                 if self._step_requested:
@@ -68,9 +67,7 @@ class ProgramExecutor(QThread):
             # Signal GUI to highlight line
             self.sgn_instruction_changed.emit(node.line_no)
 
-            # --- EXECUTE THE ACTUAL ROBOT INSTRUCTION ---
-            print(f"Executing node")
-            node.execute(self.driver)
+            node.plan(self.planner)
 
             # Increment index
             self.current_index += 1
