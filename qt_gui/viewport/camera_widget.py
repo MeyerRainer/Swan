@@ -28,10 +28,17 @@ class CameraWidget(QWidget):
         self.current_pixmap = None
 
     def show_frame(self, frame: np.ndarray):
-        height, width, channels = frame.shape
+        dimensions = frame.shape
+        height, width = dimensions[0], dimensions[1]
+        if len(dimensions) < 3:
+            channels = 1
+        else:
+            channels = dimensions[2]
+
         image = QImage(frame.data, width, height, channels*width, QImage.Format.Format_RGB888)
         self.current_pixmap = QPixmap.fromImage(image)
         self._update_pixmap()
+
 
     def resizeEvent(self, event):
 

@@ -8,7 +8,6 @@ from qt_gui.viewport.scene import *
 
 from backend.gc_serial import GCSerial
 from backend.robot_system import RobotSystem
-from backend.camera_manager import CameraManager
 from vision.camera import CameraWorker
 from vision.vision_manager import VisionManager
 from robot_program.program_manager import ProgramManager
@@ -22,7 +21,6 @@ class ApplicationContext:
         # Components
         self.serial = GCSerial()
         self.robot_sys = RobotSystem()
-        # self.camera = CameraManager()
         self.camera: CameraWorker = CameraWorker()
         self.vision_manager = VisionManager()
         self.scene = SceneGraph(root=None, dir_path="scene/")

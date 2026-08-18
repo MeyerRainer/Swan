@@ -2,11 +2,18 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
-
 import numpy as np
 import cv2
+from dataclasses import dataclass
 from typing import Optional, Tuple, Callable
 import glob
+
+
+@dataclass
+class CameraCalibration:
+    matrix: Optional[np.ndarray] = None
+    distortion: Optional[np.ndarray] = None
+    quality: Optional[float] = None
 
 
 class OpenCVCamera:
@@ -17,10 +24,7 @@ class OpenCVCamera:
         self._fps: int = fps
 
         self._cap: Optional[cv2.VideoCapture] = None
-
-        self._mtx: Optional[np.ndarray] = None
-        self._dist: Optional[np.ndarray] = None
-        self._calibration_quality: Optional[float] = None
+        self._calibration = CameraCalibration()
 
         # Callbacks
         self.on_frame: Optional[Callable[[np.ndarray], None]] = None
@@ -28,12 +32,8 @@ class OpenCVCamera:
         self.on_message: Optional[Callable[[str], None]] = None
 
     @property
-    def intrinsic_params(self) -> Tuple[np.ndarray, np.ndarray]:
-        return self._mtx, self._dist
-
-    @property
-    def calibration_quality(self) -> float:
-        return self._calibration_quality
+    def calibration(self) -> CameraCalibration:
+        return self._calibration
 
     @property
     def fps(self) -> int:
@@ -41,33 +41,40 @@ class OpenCVCamera:
 
     @fps.setter
     def fps(self, fps: int) -> None:
+        if fps <= 0:
+            raise ValueError("FPS must be greater than zero.")
         self._fps = fps
+
+    @calibration.setter
+    def calibration(self, value: CameraCalibration) -> None:
+        self._calibration = value
 
     def connect(self) -> bool:
         self._cap = cv2.VideoCapture(self._index)
         if not self._cap.isOpened():
-            if self.on_error:
-                self.on_error("Could not open camera.")
+            self._cap.release()
+            self._cap = None
             return False
         return True
 
     def disconnect(self) -> None:
-        if self._cap and self._cap.isOpened():
+        if self._cap is not None:
             self._cap.release()
+            self._cap = None
         self._cap = None
 
-    def capture(self):
-        if not self._cap or not self._cap.isOpened():
-            return
+    def capture(self) -> Optional[np.ndarray]:
+        if self._cap is None or not self._cap.isOpened():
+            return None
 
         # Capture frame.
         ok, frame = self._cap.read()
 
         # Send frame or error.
-        if ok and self.on_frame:
-            self.on_frame(frame)
-        elif not ok and self.on_error:
-            self.on_error("Could not capture frame.")
+        if not ok:
+            return None
+
+        return frame
 
     def calibrate(self, n_corners: Tuple[int, int], image_path: str) -> bool:
         # N*3 tall matrix of object points (Real world points)
@@ -113,10 +120,11 @@ class OpenCVCamera:
             self.on_error("Bad camera calibration.")
             return False
 
-        self._mtx = mtx
-        self._dist = dist
-        self._calibration_quality = ret
+        self._calibration.matrix = mtx
+        self._calibration.distortion = dist
+        self._calibration.quality = ret
         if self.on_message:
             self.on_message(f"Camera successfully calibrated with return value {ret}. Processed {num_processed_images}/{num_images} images.")
 
         return True
+
