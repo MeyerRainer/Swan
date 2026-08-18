@@ -11,6 +11,7 @@ from qt_gui.widgets.dro_widget import DROWidget
 from qt_gui.widgets.program_widget import ProgramWidget
 from qt_gui.widgets.teach_widget import TeachWidget
 from qt_gui.viewport.view_3d import View3D
+from qt_gui.widgets.vision_widget import VisionWidget
 from qt_gui.viewport.camera_widget import CameraWidget
 
 from PyQt6.QtGui import QIcon
@@ -41,6 +42,7 @@ class MainWindow(QMainWindow):
         self.scene_panel = SceneWidget()
         self.dro_panel = DROWidget()
         self.teach_panel = TeachWidget()
+        self.vision_panel = VisionWidget()
         self.terminal = self.terminal_dock.widget()
 
         # Tabify
@@ -49,11 +51,12 @@ class MainWindow(QMainWindow):
         self.left_dock.tabs.addTab(self.scene_panel, "Scene")
         self.right_dock.tabs.addTab(self.dro_panel, "DRO")
         self.right_dock.tabs.addTab(self.teach_panel, "Teach")
+        self.right_dock.tabs.addTab(self.vision_panel, "Vision")
 
         # Viewport
-        self.view_3d = View3D()
-        self.view_camera = CameraWidget()
-        self.view_scene = OpenGLViewport()
+        self.view_3d = View3D()                         # Old 3D scene, to be deleted.
+        self.view_camera = CameraWidget()               # Camera.
+        self.view_scene = OpenGLViewport()              # 3D scene.
         self.viewport_tabs = QTabWidget()
         self.viewport_tabs.addTab(self.view_3d, "3D")
         self.viewport_tabs.addTab(self.view_camera, "Camera")

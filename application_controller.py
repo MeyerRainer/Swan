@@ -90,9 +90,15 @@ class ApplicationController(QObject):
         # =========================================== Camera =============================================
         # GUI -> Context
         # Context -> GUI
-        self.app_context.camera.frame_received.connect(self.main_window.view_camera.show_frame)
-        self.app_context.camera.error.connect(self.main_window.terminal.write)
-        self.app_context.vision.processed_frame.connect(self.main_window.view_camera.show_frame)
+        # self.app_context.camera.sgn_frame_received.connect(self.main_window.view_camera.show_frame)
+        # self.app_context.camera.sgn_error.connect(self.main_window.terminal.write)
+        # self.app_context.camera.sgn_message.connect(self.main_window.terminal.write)
+        # self.app_context.vision_manager.processed_frame.connect(self.main_window.view_camera.show_frame)
+        # Pure signal connections
+        self.app_context.camera.sgn_frame_received.connect(self.main_window.view_camera.show_frame)
+        self.app_context.camera.sgn_error.connect(self.main_window.terminal.write)
+        self.app_context.camera.sgn_message.connect(self.main_window.terminal.write)
+
 
         # ======================================== Program panel =========================================
         # GUI -> Context
@@ -112,14 +118,31 @@ class ApplicationController(QObject):
         self.main_window.scene_panel.scene_tree.setModel(self.app_context.scene)
         self.main_window.view_scene.set_scene_graph_root(self.app_context.scene.root_node)
 
-    def on_viewport_tab_change(self, index):
+        # ========================================= Vision panel =========================================
+        # GUI -> Context
+        # self.main_window.vision_pan
 
+        # Context -> GUI
+        # self.app_context.vision_manager.camera.sgn_write_terminal.connect(self.main_window.terminal.write)
+
+        # ========================================= Teach panel ==========================================
+
+
+    def on_viewport_tab_change(self, index):
+        #
+        # widget = self.main_window.viewport_tabs.widget(index)
+        #
+        # if widget is self.main_window.view_camera:
+        #     self.app_context.camera.connect()
+        # else:
+        #     self.app_context.camera.disconnect()
         widget = self.main_window.viewport_tabs.widget(index)
 
         if widget is self.main_window.view_camera:
-            self.app_context.camera.connect()
+            # Clean direct call! Pushes request across thread barrier internally.
+            self.app_context.camera.start_capture()
         else:
-            self.app_context.camera.disconnect()
+            self.app_context.camera.stop_capture()
 
     def joint_move_robot_sys(self):
         # Revolute

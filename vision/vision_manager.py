@@ -3,6 +3,7 @@ import threading
 import numpy as np
 import time
 import cv2
+from vision.opencv_camera import OpenCVCamera
 
 
 class VisionManager(QObject):
@@ -15,7 +16,10 @@ class VisionManager(QObject):
 
 
     def __init__(self):
+
         super().__init__()
+
+        self.camera = OpenCVCamera()
 
         self._latest_frame = None
 
@@ -32,6 +36,12 @@ class VisionManager(QObject):
 
         with self._lock:
             self._latest_frame = frame.copy()
+
+    @staticmethod
+    def _annotate_frame(frame: np.ndarray, corners: np.ndarray, ids: np.ndarray) -> None:
+
+        cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+        cv2.drawFrameAxes(frame, camera_matrix, camera_dist, r_vec, t_vec, 0.050)
 
 
     def stop(self):
@@ -63,17 +73,16 @@ class VisionManager(QObject):
 
             self.processed_frame.emit(annotated)
 
-    def _run_pipeline(self, frame):
+    def _run_pipeline(self, frame: np.ndarray):
 
-        # frame = self.undistort(frame)
-        #
-        # markers = self.detect_markers(frame)
-        #
-        # pose = self.estimate_pose(markers)
-        #
-        # annotated = self.draw(frame, markers, pose)
-        #
+        # frame = self.undistort(frame)        #
+        # markers = self.detect_markers(frame)        #
+        # pose = self.estimate_pose(markers)        #
+        # annotated = self.draw(frame, markers, pose)        #
         # self.markers_detected.emit(markers)
         # self.pose_estimated.emit(pose)
+
+
+
 
         return frame

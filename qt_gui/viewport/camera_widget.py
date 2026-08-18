@@ -1,8 +1,8 @@
+""" Camera widget for the viewport dock for rendering camera / vision frames.
+
+Author: Rainer Meyer, r.meyer494@gmail.com
 """
-Camera widget for the viewport dock
-Author: Rainer Meyer, rot.meyer494@gmail.com
-"""
-from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout
+from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QSizePolicy
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import Qt
 
@@ -18,25 +18,60 @@ class CameraWidget(QWidget):
         self.label = QLabel()
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        # Allow the label to shrink below the pixmap's actual size
+        self.label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.label)
 
         self.current_pixmap = None
 
     def show_frame(self, frame: np.ndarray):
-
-        print(f"Frame: {frame[:3, :3 :3]}")
-        # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        h, w, ch = frame.shape
-
-        image = QImage(frame.data, w, h, ch * w, QImage.Format.Format_RGB888)
-
-        pixmap = QPixmap.fromImage(image)
-
-        self.label.setPixmap(pixmap.scaled(self.label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-        self.current_pixmap = pixmap
+        height, width, channels = frame.shape
+        image = QImage(frame.data, width, height, channels*width, QImage.Format.Format_RGB888)
+        self.current_pixmap = QPixmap.fromImage(image)
+        self._update_pixmap()
 
     def resizeEvent(self, event):
 
-        if self.current_pixmap:
-            self.label.setPixmap(self.current_pixmap.scaled(self.label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        super().resizeEvent(event)
+
+        self._update_pixmap()
+
+    def _update_pixmap(self):
+        if self.current_pixmap and not self.label.size().isEmpty():
+            self.label.setPixmap(self.current_pixmap.scaled(self.label.size(),Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+
+
+
+# class CameraWidget(QWidget):
+#
+#     def __init__(self, parent=None):
+#
+#         super().__init__(parent)
+#
+#         self.label = QLabel()
+#         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+#
+#         layout = QVBoxLayout(self)
+#         layout.addWidget(self.label)
+#
+#         self.current_pixmap = None
+#
+#     def show_frame(self, frame: np.ndarray):
+#         # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+#
+#         h, w, ch = frame.shape
+#
+#         image = QImage(frame.data, w, h, ch * w, QImage.Format.Format_RGB888)
+#
+#         pixmap = QPixmap.fromImage(image)
+#
+#         self.label.setPixmap(pixmap.scaled(self.label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+#         self.current_pixmap = pixmap
+#
+#     def resizeEvent(self, event):
+#
+#         if self.current_pixmap:
+#             self.label.setPixmap(self.current_pixmap.scaled(self.label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
