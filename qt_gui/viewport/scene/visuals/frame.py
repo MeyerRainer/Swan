@@ -4,9 +4,11 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from dataclasses import field
 
-from qt_gui.viewport.render.renderer import RenderContext
-from qt_gui.viewport.visuals.visual import Renderable
-from qt_gui.viewport.shapes import *
+from qt_gui.viewport.opengl.render.renderer import RenderContext
+from qt_gui.viewport.scene.visuals.gizmo_arrow import *
+from qt_gui.viewport.scene.visuals.gizmo_ring import *
+from qt_gui.viewport.scene.visuals.gizmo_plane import *
+from qt_gui.viewport.scene.visuals.visual import Renderable
 from robot_math.pose import Pose
 
 

@@ -3,7 +3,7 @@
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from PyQt6.QtWidgets import *
-from qt_gui.viewport.scene import *
+from qt_gui.viewport.scene.scene import *
 
 
 class SceneWidget(QWidget):

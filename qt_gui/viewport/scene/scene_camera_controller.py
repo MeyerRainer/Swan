@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import QObject, Qt
 from PyQt6.QtGui import QMouseEvent, QWheelEvent
 
-from qt_gui.viewport.scene_camera import Camera
+from qt_gui.viewport.scene.scene_camera import Camera
 
 
 class CameraController(QObject):

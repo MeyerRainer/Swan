@@ -5,7 +5,7 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 from dataclasses import dataclass
 from typing import Tuple
 
-from qt_gui.viewport.visuals.visual import Visual, Material
+from qt_gui.viewport.scene.visuals.visual import Visual
 import numpy as np
 
 @dataclass

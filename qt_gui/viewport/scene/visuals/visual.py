@@ -5,7 +5,7 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 from typing import Protocol, Any
 import numpy as np
 
-from qt_gui.viewport.render.renderer import RenderContext
+from qt_gui.viewport.opengl.render.renderer import RenderContext
 from robot_math.pose import Pose
 
 

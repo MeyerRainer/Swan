@@ -4,7 +4,7 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from __future__ import annotations
 
-from qt_gui.viewport.opengl.shaders_advanced import *
+from qt_gui.viewport.opengl.shader.shaders_advanced import *
 from robot_math.pose import Pose
 
 from OpenGL import GL

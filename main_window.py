@@ -2,16 +2,16 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
-from qt_gui.toolbar import MainToolbar
-from qt_gui.docks import *
-from qt_gui.viewport.opengl_viewport import OpenGLViewport
-from qt_gui.widgets.control_widget import ControlWidget
-from qt_gui.widgets.scene_widget import SceneWidget
-from qt_gui.widgets.dro_widget import DROWidget
-from qt_gui.widgets.program_widget import ProgramWidget
-from qt_gui.widgets.teach_widget import TeachWidget
+from qt_gui.docks.panels.toolbar import MainToolbar
+from qt_gui.docks.dock import *
+from qt_gui.viewport.opengl.opengl_viewport import OpenGLViewport
+from qt_gui.docks.panels.control_widget import ControlWidget
+from qt_gui.docks.panels.scene_widget import SceneWidget
+from qt_gui.docks.panels.dro_widget import DROWidget
+from qt_gui.docks.panels.program_widget import ProgramWidget
+from qt_gui.docks.panels.teach_widget import TeachWidget
 from qt_gui.viewport.view_3d import View3D
-from qt_gui.widgets.vision_widget import VisionWidget
+from qt_gui.docks.panels.vision_widget import VisionWidget
 from qt_gui.viewport.camera_widget import CameraWidget
 
 from PyQt6.QtGui import QIcon
@@ -42,7 +42,7 @@ class MainWindow(QMainWindow):
         self.scene_panel = SceneWidget()
         self.dro_panel = DROWidget()
         self.teach_panel = TeachWidget()
-        self.vision_panel = VisionWidget()
+        self.vision_panel = VisionWidget(calibration_image_dir=self.settings.value("camera_calibration_directory", QDir.homePath()))
         self.terminal = self.terminal_dock.widget()
 
         # Tabify
@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):
 
     def build_ui(self):
         self.setWindowTitle("Swan")
-        self.setWindowIcon(QIcon("resources/icons/icon256_nobg.png"))
+        self.setWindowIcon(QIcon("qt_gui/resources/icons/icon256_nobg.png"))
         self.create_menu()
         self.addToolBar(self.toolbar)
 

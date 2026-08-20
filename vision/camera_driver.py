@@ -1,11 +1,8 @@
-import time
-import numpy as np
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot, QThread, QTimer
-
 from vision.opencv_camera import OpenCVCamera
 
 
-class CameraWorker(QObject):
+class CameraDriver(QObject):
 
     # Signals.
     sgn_frame_received = pyqtSignal(object)

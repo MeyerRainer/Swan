@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Optional
 import math
 
-from qt_gui.viewport.visuals.gizmo import Gizmo, HandleType
+from qt_gui.viewport.gizmo.gizmo import Gizmo, HandleType
 from qt_gui.viewport import cg_math
 from robot_math.pose import Pose
 

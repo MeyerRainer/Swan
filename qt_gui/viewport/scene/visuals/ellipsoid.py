@@ -9,7 +9,7 @@ import numpy as np
 import math
 
 from robot_math.pose import Pose
-from qt_gui.viewport.visuals.visual import Visual
+from qt_gui.viewport.scene.visuals.visual import Visual
 
 
 @dataclass

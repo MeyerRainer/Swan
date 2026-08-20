@@ -87,14 +87,13 @@ class ApplicationController(QObject):
         self.main_window.viewport_tabs.currentChanged.connect(self.on_viewport_tab_change)
         self.main_window.view_scene.renderer.root_node = self.app_context.scene.root_node
 
-        # =========================================== Camera =============================================
+        # =========================================== Vision =============================================
         # GUI -> Context
         # Context -> GUI
-        self.app_context.camera.sgn_frame_received.connect(self.main_window.view_camera.show_frame)
-        # self.app_context.camera.sgn_frame_received.connect(self.app_context.vision_manager.process_frame)
-        # self.app_context.vision_manager.sgn_processed_frame.connect(self.main_window.view_camera.show_frame)
-        self.app_context.camera.sgn_error.connect(self.main_window.terminal.write)
-        self.app_context.camera.sgn_message.connect(self.main_window.terminal.write)
+        self.app_context.vision_sys.sgn_error.connect(self.main_window.terminal.write)
+        self.app_context.vision_sys.sgn_message.connect(self.main_window.terminal.write)
+        self.app_context.vision_sys.sgn_processed_frame.connect(self.main_window.view_camera.show_frame)
+        self.app_context.vision_sys.sgn_raw_frame.connect(self.main_window.view_camera.show_frame)
 
 
         # ======================================== Program panel =========================================
@@ -128,9 +127,9 @@ class ApplicationController(QObject):
     def on_viewport_tab_change(self, index):
         widget = self.main_window.viewport_tabs.widget(index)
         if widget is self.main_window.view_camera:
-            self.app_context.camera.start()
+            self.app_context.vision_sys.start()
         else:
-            self.app_context.camera.stop()
+            self.app_context.vision_sys.stop()
 
     def joint_move_robot_sys(self):
         # Revolute

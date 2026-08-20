@@ -5,11 +5,10 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 
 import config
-from qt_gui.widgets.custom_slider import CustomSlider
+from qt_gui.docks.panels.custom_slider import CustomSlider
 from config import *
 
 from PyQt6.QtWidgets import *
-from PyQt6.QtCore import Qt
 
 slider_style = """
     /* The horizontal track background */

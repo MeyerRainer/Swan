@@ -4,13 +4,13 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from typing import override
 from PyQt6.QtCore import QTimer
-from PyQt6.QtGui import QMouseEvent, QWheelEvent, QVector3D
+from PyQt6.QtGui import QMouseEvent, QWheelEvent
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 
-from qt_gui.viewport.scene_camera_controller import CameraController
-from qt_gui.viewport.render.renderer import SceneRenderer
-from qt_gui.viewport.gizmo_controller import GizmoController
-from qt_gui.viewport.scene_camera import Camera
+from qt_gui.viewport.scene.scene_camera_controller import CameraController
+from qt_gui.viewport.opengl.render.renderer import SceneRenderer
+from qt_gui.viewport.gizmo.gizmo_controller import GizmoController
+from qt_gui.viewport.scene.scene_camera import Camera
 from qt_gui.viewport import cg_math
 
 

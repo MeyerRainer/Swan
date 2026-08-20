@@ -6,8 +6,8 @@ from PyQt6.QtGui import QVector3D
 from enum import Enum, auto
 
 from robot_math.pose import Pose
-from qt_gui.viewport.visuals.visual import Renderable
-from qt_gui.viewport.visuals.frame import ArrowFrame, RingFrame, PlaneFrame
+from qt_gui.viewport.scene.visuals.visual import Renderable
+from qt_gui.viewport.scene.visuals.frame import ArrowFrame, RingFrame, PlaneFrame
 
 
 class HandleType(Enum):
