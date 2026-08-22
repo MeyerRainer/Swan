@@ -24,7 +24,7 @@ class OpenGLViewport(QOpenGLWidget):
         self.camera_controller = CameraController(self.camera, parent=self)
         self.renderer = SceneRenderer()
         self.gizmo_controller = GizmoController()
-        self.scene_root = None
+        self.scene_tree = None
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update)
         self.timer.start(16)
@@ -50,9 +50,9 @@ class OpenGLViewport(QOpenGLWidget):
     def wheelEvent(self, event: QWheelEvent):
         self.camera_controller.handle_wheel(event)
 
-    def set_scene_graph_root(self, root):
-        self.scene_root = root
-        self.gizmo_controller.set_scene_graph_root(root)
+    def set_scene_tree(self, scene):
+        self.scene_tree = scene
+        self.gizmo_controller.set_scene_graph_root(scene)
 
     @override
     def initializeGL(self):
@@ -78,7 +78,7 @@ class OpenGLViewport(QOpenGLWidget):
         self.renderer.context.view_matrix = self.camera.get_view_matrix()
         self.renderer.context.camera_position = self.camera.get_camera_position()
         # Draw.
-        self.renderer.render_scene(self.scene_root)
+        self.renderer.render_scene(self.scene_tree)
 
     def cleanupGL(self):
         """On shutdown.

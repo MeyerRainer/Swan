@@ -81,7 +81,7 @@ class SceneRenderer:
         # Update projection matrices if needed
 
     # def render_scene(self, root_node: SceneNode, projection_matrix: QMatrix4x4, view_matrix: QMatrix4x4, camera_pos: QVector3D):
-    def render_scene(self, root) -> None:
+    def render_scene(self, tree) -> None:
 
         # Full clear on every frame
         GL.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT)
@@ -103,7 +103,7 @@ class SceneRenderer:
             GL.glUniform3f(cam_loc, self.context.camera_position.x(), self.context.camera_position.y(), self.context.camera_position.z())
 
         # Render root.
-        root.render(self.context)
+        tree.render(render_context=self.context)
 
     def render_visual(self, visual: Any, pose: Pose):
 

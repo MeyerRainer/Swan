@@ -37,20 +37,22 @@ class GizmoController:
 
         self.active_gizmo: Optional[Gizmo] = None
         self.DC = DragContext()
-        self.scene_root = None
+        self.scene_tree = None
 
     @property
     def is_active(self):
         return self.active_gizmo is not None
 
     def set_scene_graph_root(self, root):
-        self.scene_root = root
+        self.scene_tree = root
 
     def handle_mouse_press(self, ray_origin: QVector3D, ray_dir: QVector3D, cam_pos: QVector3D) -> None:
-        handle, gizmo = self.scene_root.ray_hit(ray_origin, ray_dir)
-        if handle is not HandleType.NONE:
-            self.active_gizmo = gizmo
-            self.start_drag(ray_origin, ray_dir, cam_pos, handle)
+        ray_hit = self.scene_tree.ray_hit(ray_origin, ray_dir)
+        if ray_hit is not None:
+            handle, gizmo = ray_hit
+            if handle is not HandleType.NONE:
+                self.active_gizmo = gizmo
+                self.start_drag(ray_origin, ray_dir, cam_pos, handle)
 
     def handle_mouse_move(self, ray_origin: QVector3D, ray_dir: QVector3D):
         if self.active_gizmo is not None:

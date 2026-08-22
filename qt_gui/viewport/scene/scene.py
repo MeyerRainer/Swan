@@ -4,39 +4,82 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from PyQt6.QtCore import Qt, QModelIndex, QAbstractItemModel, QIODevice, QDataStream, QMimeData, QByteArray
 from typing_extensions import override
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 from pathlib import Path
 
+import config
+from backend.robot_system import RobotSystem
 from qt_gui.viewport.scene.visuals.mesh import MeshObject, MeshSpecs
 from qt_gui.viewport.scene.visuals.ellipsoid import EllipsoidSpecs, Ellipsoid
 from qt_gui.viewport.gizmo.gizmo import Gizmo
 from qt_gui.viewport.scene.visuals.grid import Grid, GridSpecs
 from qt_gui.viewport.scene.scene_node import SceneNode
+from robot_math.pose import Pose
 
 
 class SceneGraph(QAbstractItemModel):
 
     MIME_TYPE = "application/x-scenenode-pointer"
 
-    def __init__(self, root: Optional[SceneNode] = None, parent=None, dir_path: str = ""):
+    def __init__(self, robot_sys: RobotSystem, root: Optional[SceneNode] = None, parent=None, dir_path: str = ""):
 
         super().__init__(parent)
 
+        self._robot_sys = robot_sys  # Reference to robot system
+
+        # self._robot_link_nodes = []  # SceneNodes for robot links
+        # self._robot_spring_nodes = []
+        # self._robot_counter_weight_node = None
+
         self.root_node = root or SceneNode("Root")
+
+        self._robot_link_nodes: Optional[Dict[str, SceneNode]] = {}  # SceneNodes for robot links
+        self._robot_spring_nodes: Optional[Dict[str, SceneNode]] = {}
+        self._robot_counter_weight_node: Optional[SceneNode] = None
+
         if dir_path:
             self.build_from_directory(dir_path)
 
+        self.L0 = SceneNode(name="L0", parent=self.root_node)
+        self.L0.visual = MeshObject(MeshSpecs(file_path=Path("scene/robot/L0.obj")))
+
         grid_node = SceneNode(name="Grid", parent=self.root_node)
         grid_node.visual = Grid(name="Grid", params=GridSpecs())
-        self.add_node(parent_idx=QModelIndex(), node=grid_node)
+        # self.add_node(parent_idx=QModelIndex(), node=grid_node)
 
         ellipsoid_node = SceneNode(name="Ellipsoid", parent=self.root_node)
         ellipsoid_node.visual = Ellipsoid(EllipsoidSpecs(radii=(0.05, 0.02, 0.01)))
         ellipsoid_node.gizmo = Gizmo(ellipsoid_node)
-        self.add_node(parent_idx=QModelIndex(), node=grid_node)
+        # self.add_node(parent_idx=QModelIndex(), node=ellipsoid_node)
+
+    def update_robot_sys(self):
+        link_poses = self._robot_sys.sys_state.mcu.manipulator.link_poses
+        sprint_poses = self._robot_sys.sys_state.mcu.manipulator.spring_poses
+        cw_pose = self._robot_sys.sys_state.mcu.manipulator.counter_weight_pose
+
+        if "L1" in self._robot_link_nodes:
+            self._robot_link_nodes["L1"].pose = Pose.from_position(config.BASE_OFFSET)
+        if "L2" in self._robot_link_nodes:
+            self._robot_link_nodes["L2"].pose = link_poses[0]
+        if "L3" in self._robot_link_nodes:
+            self._robot_link_nodes["L3"].pose = link_poses[1]
+        # self._robot_spring_nodes["left_down"].pose = sprint_poses[0]
+        # self._robot_spring_nodes["right_down"].pose = sprint_poses[1]
+        # self._robot_spring_nodes["left_up"].pose = sprint_poses[2]
+        # self._robot_spring_nodes["right_up"].pose = sprint_poses[3]
+        #
+        # self._robot_counter_weight_node.pose = cw_pose
 
     def size(self):
         return self.root_node.num_nodes()
+
+    def render(self, render_context) -> None:
+        # Recursively render from root.
+        self.root_node.render(render_context)
+
+    def ray_hit(self, ray_origin, ray_dir) -> Optional[Any]:
+        # Recursively call ray_hit from root.
+        return self.root_node.ray_hit(ray_origin, ray_dir)
 
     @property
     def root(self) -> SceneNode:
@@ -149,6 +192,24 @@ class SceneGraph(QAbstractItemModel):
         self.endRemoveRows()
         return True
 
+    def print_tree(self, node: Optional[SceneNode] = None, indent: int = 1) -> None:
+        """Recursively print the scene graph hierarchy for debugging."""
+        if node is None:
+            node = self.root_node
+
+        prefix = "    " * indent
+        pose = node.pose
+
+        print(f"{prefix}├─ {node.name or '<unnamed>'} [visible={node.visible}, "
+            f"visual={'Y' if node.visual else 'N'}, "
+            f"gizmo={'Y' if node.gizmo else 'N'}]")
+
+        print(f"{prefix}│  Position={pose.position}, Euler={pose.zyz_euler}")
+        print(f"{prefix}│")
+
+        for child in node.children:
+            self.print_tree(child, indent + 1)
+
     def update(self):
         # TODO
         pass
@@ -206,11 +267,45 @@ class SceneGraph(QAbstractItemModel):
         for entry in sorted(current_path.iterdir()):
             if entry.is_dir():
                 dir_node = SceneNode(entry.name, parent=parent_node)
+                # if entry.name == "robot":
+                #     self._set_robot_visuals(entry)
+                # else:
                 self._populate_directory_tree(entry, dir_node)
             elif entry.suffix.lower() == ".obj":
                 new_node: SceneNode = SceneNode(name=entry.name, parent=parent_node)
                 mesh_params = MeshSpecs(file_path=entry)
                 new_node.visual = MeshObject(mesh_params)
+                # If new node is a robot link, take a reference to it.
+                if entry.parent.name == "robot":
+                    link_name: str = entry.name.split(".")[0]
+                    self._robot_link_nodes[link_name] = new_node
+
+
+
+    # def _set_robot_visuals(self, current_path: Path) -> None:
+    #     """ Build robot using links in the "robot" folder and DH-table in config.
+    #     """
+    #     # Set meshes for links
+    #     for entry in sorted(current_path.iterdir()):
+    #         if entry.is_dir():
+    #             print(entry)
+    #             raise ValueError("Robot directory should only contain .obj files.")
+    #         if entry.name == "L0.obj":
+    #             self._robot_link_nodes['L0'].visual = MeshObject(MeshSpecs(file_path=entry))
+    #             # print(f"Scene: L0 visual set with file_path: {entry}")
+    #         if entry.name == "L1.obj":
+    #             self._robot_link_nodes['L1'].visual = MeshObject(MeshSpecs(file_path=entry))
+    #         if entry.name == "L2.obj":
+    #             self._robot_link_nodes['L2'].visual = MeshObject(MeshSpecs(file_path=entry))
+    #         if entry.name == "L3.obj":
+    #             self._robot_link_nodes['L3'].visual = MeshObject(MeshSpecs(file_path=entry))
+    #         if entry.name == "L4.obj":
+    #             self._robot_link_nodes['L4'].visual = MeshObject(MeshSpecs(file_path=entry))
+    #         if entry.name == "L5.obj":
+    #             self._robot_link_nodes['L5'].visual = MeshObject(MeshSpecs(file_path=entry))
+    #         if entry.name == "L6.obj":
+    #             self._robot_link_nodes['L6'].visual = MeshObject(MeshSpecs(file_path=entry))
+    #     return
 
     # --- Drag & Drop MIME Handlers ---
 

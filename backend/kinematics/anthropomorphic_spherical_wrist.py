@@ -11,7 +11,7 @@ from config import *
 import config
 import utils
 from robot_math.pose import Pose
-from typing import Tuple, List, Optional, Literal, Any
+from typing import Tuple, List, Optional, Literal, Any, Dict
 
 
 class Singularity(Enum):
@@ -38,14 +38,6 @@ class IkSolution:
     joint_solution: np.ndarray = field(default_factory=np.zeros(6, dtype=np.float64))
     success: bool = False
 
-@dataclass
-class IkParams:
-    wrist_lefty: bool
-    wrist_righty: bool
-    shoulder_lefty: bool
-    shoulder_righty: bool
-    elbow_up: bool
-    elbow_down: bool
 
 class ASWKinematics:
 
@@ -81,11 +73,13 @@ class ASWKinematics:
         mot_vec[2] = jnt_vec[2] + jnt_vec[1]
         return mot_vec
 
-    def forward(self, jnt_vec: np.ndarray) -> List[Pose]:
+    def forward(self, jnt_vec: np.ndarray) -> Dict[str, List[Pose]]:
         """ Forward kinematics. Joint space -> operational space.
         :param jnt_vec: Absolute joint coordinates, radians.
         :return: List of Pose-objects, one for each link.
         """
+        m3: np.float64 = self.jnt2mot(jnt_vec)[2]
+
         link_poses: List[Pose] = []
         T_previous: np.ndarray = np.eye(4, dtype=np.float64)
         for idx, row in enumerate(self.DH):
@@ -108,7 +102,74 @@ class ASWKinematics:
         # Add tool transformation.
         link_poses.append(Pose(SE3=link_poses[-1].SE3 @ config.TOOL_OFS))
 
-        return link_poses
+        spring_poses = self.spring_poses(T1=link_poses[0], q2=jnt_vec[1])
+        counter_weight_pose: Pose = self.counter_weight_pose(T1=link_poses[0], m3=m3)
+        parallel_link_pose: Pose = self.parallel_link_pose(T1=link_poses[0], T2=link_poses[1], m3=m3)
+
+        return {
+            "link_poses": link_poses,
+            "spring_poses": spring_poses,
+            "counter_weight_pose": counter_weight_pose,
+            "parallel_link_pose": parallel_link_pose,
+        }
+
+    @staticmethod
+    def spring_poses(T1: Pose, q2: np.float64) -> List[Pose]:
+        """ Computes poses for link 2 outer counter springs.
+        :param T1: Link 1 w.r.t. base.
+        :param q2: Joint 2 value in radians.
+        :return: Poses top and bottom part for left and right spring.
+        """
+        L = config.L2_LENGTH
+        a = np.float64(L + config.ELBOW_TO_SPRING)
+        c = config.SHOULDER_TO_SPRING
+        b_sqr = 2*L*(L - c*np.sin(q2) + c**2)  # Counter spring length squared
+        gamma = np.acos(a**2 + b_sqr + c**2 / (2*a*np.sqrt(b_sqr)), dtype=np.float64)  # Angle between Link 2 and counter spring
+
+        if gamma < 0:  # Forward
+            delta = np.float64(q2 + gamma)
+        else:  # Backward
+            delta = np.float64(q2 - gamma)
+
+        R = np.eye(3)
+        R[0, 0], R[0, 1] = np.cos(delta, dtype=np.float64), -np.sin(delta, dtype=np.float64)
+        R[1, 0], R[1, 1] = np.sin(delta, dtype=np.float64), np.cos(delta, dtype=np.float64)
+
+        def spring_transform(xyz: np.ndarray, rot: np.ndarray) -> np.ndarray:
+            T = np.eye(4)
+            T[:3, 3] = xyz
+            T[:3, :3] = rot
+            return T
+
+        left_down: Pose = Pose(T1.SE3 @ spring_transform(np.array([0, 0, config.SPRING_CENTER_DIST], dtype=np.float64), rot=R))
+        right_down: Pose = Pose(T1.SE3 @ spring_transform(np.array([0, 0, -config.SPRING_CENTER_DIST], dtype=np.float64), rot=R))
+        left_up: Pose = Pose(T1.SE3 @ spring_transform(np.array([np.sin(a), np.cos(a), config.SPRING_CENTER_DIST], dtype=np.float64), rot=R))
+        right_up: Pose = Pose(T1.SE3 @ spring_transform(np.array([np.sin(a), np.cos(a), -config.SPRING_CENTER_DIST], dtype=np.float64), rot=R))
+
+        return [left_down, right_down, left_up, right_up]
+
+
+    def counter_weight_pose(self, T1: Pose, m3: np.float64) -> Pose:
+        # Trig functions
+        dh_table_idx: int = 0
+        s_nu, c_nu = np.sin(m3 + self.DH[dh_table_idx]['nu_offset']), np.cos(m3 + self.DH[dh_table_idx]['nu_offset'])
+        s_al, c_al = self.sin_alpha[dh_table_idx], self.cos_alpha[dh_table_idx]
+
+        T: np.ndarray = np.array([
+            [c_nu, -s_nu * c_al, s_nu * s_al, self.DH[dh_table_idx]['a'] * c_nu],
+            [s_nu, c_nu * c_al, -c_nu * s_al, self.DH[dh_table_idx]['a'] * s_nu],
+            [np.float64(0), s_al, c_al, self.DH[dh_table_idx]['d']],
+            [np.float64(0), np.float64(0), np.float64(0), np.float64(1)]
+        ])
+
+        return Pose(T1.SE3 @ T)
+
+    @staticmethod
+    def parallel_link_pose(T1: Pose, T2: Pose, m3: np.float64):
+        parallel_link_pose: np.ndarray = np.eye(4)
+        parallel_link_pose[:3, 3] = np.array([-np.cos(m3*config.PARALLEL_LINK_DIST), -np.sin(m3*config.PARALLEL_LINK_DIST), 0.], dtype=np.float64)
+        parallel_link_pose[:3, :3] = T2.SE3[:3, :3].copy()
+        return Pose(T1.SE3 @ parallel_link_pose)
 
     def inverse(self, target_pose: Pose, prev_jnt_vec: np.ndarray, shoulder_flip: bool = False,
                elbow_down: bool = False, wrist_flip: bool = False, jnt_correction=False) -> IkSolution:

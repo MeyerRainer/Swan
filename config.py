@@ -103,7 +103,17 @@ DH_TABLE: List[dict] = [
     {'a': np.float64(0.000), 'alpha': np.float64(0.000),        'd': np.float64(0.0353), 'nu_offset': np.float64(0.000)},
 ]
 
+# Spring geometry
+SHOULDER_TO_SPRING = np.float64(0.040)
+ELBOW_TO_SPRING = np.float64(0.025)
+SPRING_CENTER_DIST = np.float64(0.056)
+L2_LENGTH = np.float64(0.160)
+
+PARALLEL_LINK_DIST = np.float64(0.090)
+
 CHAR_LEN = np.float64(0.2)  # Characteristic length, m
+
+BASE_OFFSET = np.array([0.1, 0.3, 0.0], dtype=np.float64)  # Offset from world origin to base at zero linear joints.
 
 # Tool frame respect to J6 frame
 TOOL_OFS = np.array([

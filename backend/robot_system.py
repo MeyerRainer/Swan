@@ -30,7 +30,7 @@ class RobotSystem(QObject):
         super().__init__()
 
         self._manipulator = Manipulator()
-        self._linear_axis = LinearAxis()
+        self._linear_axis = LinearAxis(base_offset=config.BASE_OFFSET)
 
         self.gc_writer = GCodeWriter()
 
@@ -323,6 +323,8 @@ class RobotSystem(QObject):
             'ops_coords_base': tool_wrt_base,
             'ops_coords_world': tool_wrt_world,
             'link_poses': self._manipulator.state.mcu.link_poses,
+            'spring_poses': self._manipulator.state.mcu.spring_poses,
+            'counter_weight_pose': self._manipulator.state.mcu.counter_weight_pose,
             'condition_world': cond_world,
             'condition_base': cond_base,
             'condition_tool': cond_tool,

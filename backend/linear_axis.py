@@ -11,10 +11,10 @@ import numpy as np
 
 class LinearAxis:
 
-    def __init__(self):
+    def __init__(self, base_offset: np.ndarray):
 
-        self.BASE_OFFSET = np.array([0.1, 0.3, 0.0], dtype=np.float64)
-        self.kinematics = TrivKins1D(self.BASE_OFFSET, config.LINEAR_AXIS)
+        self.base_offset = base_offset
+        self.kinematics = TrivKins1D(self.base_offset, config.LINEAR_AXIS)
 
         self.state = LinearAxisState(self.kinematics)
 

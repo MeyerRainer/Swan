@@ -14,7 +14,7 @@ from robot_math.quaternion import Quaternion
 
 class SceneNode:
 
-    def __init__(self, name: str = "", parent: Optional["SceneNode"] = None) -> None:
+    def __init__(self, name: str = "", parent: Optional["SceneNode"] = None, transform: Optional[Pose] = None) -> None:
 
         self.name: str = name
         self.parent: Optional["SceneNode"] = None
@@ -23,7 +23,7 @@ class SceneNode:
         self.selectable: bool = True
         self.expanded: bool = False
 
-        self._pose: Pose = Pose.identity()
+        self._pose: Pose = transform if transform is not None else Pose.identity()
         self.visual: Optional[Renderable] = None
         self.gizmo: Optional[Gizmo] = None
         self.icon = None
@@ -73,6 +73,7 @@ class SceneNode:
 
     @position.setter
     def position(self, pos: QVector3D) -> None:
+        # print(f"SceneNode: {self} position set to {pos}")
         self._pose.position = np.array([pos.x(), pos.y(), pos.z()])
 
     @property
@@ -89,9 +90,10 @@ class SceneNode:
         if not self.visible:
             return
         if self.visual is not None:
-            self.visual.render(context, self._pose)
+            self.visual.render(context, pose=self._pose)
+            # print(f"{self.name} render: Pose={self._pose}")
         if self.gizmo is not None:
-            self.gizmo.render(context, self._pose)
+            self.gizmo.render(context, pose=self._pose)
         for child in self.children:
             child.render(context)
 

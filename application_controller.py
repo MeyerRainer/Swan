@@ -112,7 +112,7 @@ class ApplicationController(QObject):
 
         # ========================================= Scene panel ==========================================
         self.main_window.scene_panel.scene_tree.setModel(self.app_context.scene)
-        self.main_window.view_scene.set_scene_graph_root(self.app_context.scene.root_node)
+        self.main_window.view_scene.set_scene_tree(self.app_context.scene)
 
         # ========================================= Vision panel =========================================
         # GUI -> Context
