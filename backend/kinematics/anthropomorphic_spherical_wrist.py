@@ -6,6 +6,7 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 from dataclasses import dataclass, field
 from enum import Enum, auto
 import numpy as np
+from pyqtgraph.examples.GLMeshItem import m3
 
 from config import *
 import config
@@ -78,7 +79,9 @@ class ASWKinematics:
         :param jnt_vec: Absolute joint coordinates, radians.
         :return: List of Pose-objects, one for each link.
         """
-        m3: np.float64 = self.jnt2mot(jnt_vec)[2]
+        mot_vec = self.jnt2mot(jnt_vec)
+        m2: np.float64 = mot_vec[1]
+        m3: np.float64 = mot_vec[2]
 
         link_poses: List[Pose] = []
         T_previous: np.ndarray = np.eye(4, dtype=np.float64)
@@ -103,8 +106,8 @@ class ASWKinematics:
         link_poses.append(Pose(SE3=link_poses[-1].SE3 @ config.TOOL_OFS))
 
         spring_poses = self.spring_poses(T1=link_poses[0], q2=jnt_vec[1])
-        counter_weight_pose: Pose = self.counter_weight_pose(T1=link_poses[0], m3=m3)
-        parallel_link_pose: Pose = self.parallel_link_pose(T1=link_poses[0], T2=link_poses[1], m3=m3)
+        counter_weight_pose: Pose = self.counter_weight_pose(T1=link_poses[0], mot3=m3)
+        parallel_link_pose: Pose = self.parallel_link_pose(T1=link_poses[0], mot2=m2, mot3=m3)
 
         return {
             "link_poses": link_poses,
@@ -126,10 +129,10 @@ class ASWKinematics:
         b_sqr = 2*L*(L - c*np.sin(q2) + c**2)  # Counter spring length squared
         gamma = np.acos(a**2 + b_sqr + c**2 / (2*a*np.sqrt(b_sqr)), dtype=np.float64)  # Angle between Link 2 and counter spring
 
-        if gamma < 0:  # Forward
-            delta = np.float64(q2 + gamma)
-        else:  # Backward
+        if q2 < 0:  # Forward
             delta = np.float64(q2 - gamma)
+        else:  # Backward
+            delta = np.float64(q2 + gamma)
 
         R = np.eye(3)
         R[0, 0], R[0, 1] = np.cos(delta, dtype=np.float64), -np.sin(delta, dtype=np.float64)
@@ -148,27 +151,23 @@ class ASWKinematics:
 
         return [left_down, right_down, left_up, right_up]
 
-
-    def counter_weight_pose(self, T1: Pose, m3: np.float64) -> Pose:
-        # Trig functions
-        dh_table_idx: int = 0
-        s_nu, c_nu = np.sin(m3 + self.DH[dh_table_idx]['nu_offset']), np.cos(m3 + self.DH[dh_table_idx]['nu_offset'])
-        s_al, c_al = self.sin_alpha[dh_table_idx], self.cos_alpha[dh_table_idx]
-
-        T: np.ndarray = np.array([
-            [c_nu, -s_nu * c_al, s_nu * s_al, self.DH[dh_table_idx]['a'] * c_nu],
-            [s_nu, c_nu * c_al, -c_nu * s_al, self.DH[dh_table_idx]['a'] * s_nu],
-            [np.float64(0), s_al, c_al, self.DH[dh_table_idx]['d']],
-            [np.float64(0), np.float64(0), np.float64(0), np.float64(1)]
-        ])
-
+    @staticmethod
+    def counter_weight_pose(T1: Pose, mot3: np.float64) -> Pose:
+        s_nu, c_nu = np.sin(mot3), np.cos(mot3)
+        T = np.eye(4)
+        T[0, 0], T[0, 1] = c_nu, -s_nu
+        T[1, 0], T[1, 1] = s_nu, c_nu
         return Pose(T1.SE3 @ T)
 
     @staticmethod
-    def parallel_link_pose(T1: Pose, T2: Pose, m3: np.float64):
+    def parallel_link_pose(T1: Pose, mot2: np.float64, mot3: np.float64):
         parallel_link_pose: np.ndarray = np.eye(4)
-        parallel_link_pose[:3, 3] = np.array([-np.cos(m3*config.PARALLEL_LINK_DIST), -np.sin(m3*config.PARALLEL_LINK_DIST), 0.], dtype=np.float64)
-        parallel_link_pose[:3, :3] = T2.SE3[:3, :3].copy()
+        parallel_link_pose[:3, 3] = np.array([-config.PARALLEL_LINK_DIST*np.cos(mot3), -config.PARALLEL_LINK_DIST*np.sin(mot3), 0.], dtype=np.float64)
+        s_m2, c_m2 = np.sin(mot2), np.cos(mot2)
+        R = np.eye(3)
+        R[0, 0], R[0, 1] = c_m2, -s_m2
+        R[1, 0], R[1, 1] = s_m2, c_m2
+        parallel_link_pose[:3, :3] = R
         return Pose(T1.SE3 @ parallel_link_pose)
 
     def inverse(self, target_pose: Pose, prev_jnt_vec: np.ndarray, shoulder_flip: bool = False,

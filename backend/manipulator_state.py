@@ -27,6 +27,7 @@ class ManipulatorStateObject:
         self._link_poses: List[Pose] = []
         self._spring_poses: List[Pose] = []
         self._counter_weight_pose: Optional[Pose] = None
+        self._parallel_link_pose: Optional[Pose] = None
         self._sing_vals_translation: np.ndarray = np.zeros(3, dtype=np.float64)
         self._sing_vecs_translation: np.ndarray = np.zeros((3, 3), dtype=np.float64)
         self._sing_vals_rotation: np.ndarray = np.zeros(3, dtype=np.float64)
@@ -60,6 +61,10 @@ class ManipulatorStateObject:
         return self._counter_weight_pose.copy()
 
     @property
+    def parallel_link_pose(self) -> Pose:
+        return self._parallel_link_pose.copy()
+
+    @property
     def jacobian(self) -> np.ndarray:
         return self._jacobian.copy()
 
@@ -81,6 +86,7 @@ class ManipulatorStateObject:
         self._link_poses = poses["link_poses"]
         self._spring_poses = poses["spring_poses"]
         self._counter_weight_pose = poses["counter_weight_pose"]
+        self._parallel_link_pose = poses["parallel_link_pose"]
         self._ops_state = self._link_poses[-1]
         self._jacobian = self._kinematics.jacobian(jnt_vec)
 

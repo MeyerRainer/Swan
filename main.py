@@ -7,7 +7,7 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 from main_window import MainWindow
 from application_context import ApplicationContext
 from application_controller import ApplicationController
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QStyleFactory
 import sys
 import ctypes
 
@@ -19,6 +19,7 @@ class Application:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(self.app_id)
 
         self.app = QApplication(sys.argv)
+        self.app.setStyle("windows11")
 
         self.window = MainWindow()
         self.context = ApplicationContext()

@@ -54,15 +54,31 @@ class SceneGraph(QAbstractItemModel):
 
     def update_robot_sys(self):
         link_poses = self._robot_sys.sys_state.mcu.manipulator.link_poses
-        sprint_poses = self._robot_sys.sys_state.mcu.manipulator.spring_poses
+        spring_poses = self._robot_sys.sys_state.mcu.manipulator.spring_poses
         cw_pose = self._robot_sys.sys_state.mcu.manipulator.counter_weight_pose
-
+        pl_pose = self._robot_sys.sys_state.mcu.manipulator.parallel_link_pose
+        base_offset: Pose = Pose.from_position(config.BASE_OFFSET)
         if "L1" in self._robot_link_nodes:
-            self._robot_link_nodes["L1"].pose = Pose.from_position(config.BASE_OFFSET)
+            self._robot_link_nodes["L1"].pose = base_offset
         if "L2" in self._robot_link_nodes:
-            self._robot_link_nodes["L2"].pose = link_poses[0]
+            self._robot_link_nodes["L2"].pose = base_offset.compose(link_poses[0])
         if "L3" in self._robot_link_nodes:
-            self._robot_link_nodes["L3"].pose = link_poses[1]
+            self._robot_link_nodes["L3"].pose = base_offset.compose(link_poses[1])
+        if "L4" in self._robot_link_nodes:
+            self._robot_link_nodes["L4"].pose = base_offset.compose(link_poses[2])
+        if "L5" in self._robot_link_nodes:
+            self._robot_link_nodes["L5"].pose = base_offset.compose(link_poses[3])
+        if "L6" in self._robot_link_nodes:
+            self._robot_link_nodes["L6"].pose = base_offset.compose(link_poses[4])
+        if "ToolFrame" in self._robot_link_nodes:
+            self._robot_link_nodes["ToolFrame"].pose = base_offset.compose(link_poses[5].compose(Pose(config.TOOL_OFS)))
+        if "LCW" in self._robot_link_nodes:
+            self._robot_link_nodes["LCW"].pose = base_offset.compose(cw_pose)
+        if "LPL" in self._robot_link_nodes:
+            self._robot_link_nodes["LPL"].pose = base_offset.compose(pl_pose)
+        if "SpringDown" in self._robot_link_nodes:
+            self._robot_link_nodes["SpringDown"].pose = base_offset.compose(spring_poses[0])
+
         # self._robot_spring_nodes["left_down"].pose = sprint_poses[0]
         # self._robot_spring_nodes["right_down"].pose = sprint_poses[1]
         # self._robot_spring_nodes["left_up"].pose = sprint_poses[2]
