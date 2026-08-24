@@ -6,8 +6,6 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 from dataclasses import dataclass, field
 from enum import Enum, auto
 import numpy as np
-from pyqtgraph.examples.GLMeshItem import m3
-
 from config import *
 import config
 import utils

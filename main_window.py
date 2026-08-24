@@ -10,7 +10,6 @@ from qt_gui.docks.panels.scene_widget import SceneWidget
 from qt_gui.docks.panels.dro_widget import DROWidget
 from qt_gui.docks.panels.program_widget import ProgramWidget
 from qt_gui.docks.panels.teach_widget import TeachWidget
-from qt_gui.viewport.view_3d import View3D
 from qt_gui.docks.panels.vision_widget import VisionWidget
 from qt_gui.viewport.camera_widget import CameraWidget
 
@@ -54,13 +53,11 @@ class MainWindow(QMainWindow):
         self.right_dock.tabs.addTab(self.vision_panel, "Vision")
 
         # Viewport
-        self.view_3d = View3D()                         # Old 3D scene, to be deleted.
-        self.view_camera = CameraWidget()               # Camera.
         self.view_scene = OpenGLViewport()              # 3D scene.
+        self.view_camera = CameraWidget()               # Camera.
         self.viewport_tabs = QTabWidget()
-        self.viewport_tabs.addTab(self.view_3d, "3D")
-        self.viewport_tabs.addTab(self.view_camera, "Camera")
         self.viewport_tabs.addTab(self.view_scene, "Scene")
+        self.viewport_tabs.addTab(self.view_camera, "Camera")
 
         self.setCentralWidget(self.viewport_tabs)
 
@@ -157,5 +154,5 @@ class MainWindow(QMainWindow):
     def update_status(self, status_dict: dict):
         self.toolbar.update_status(status_dict)
         self.dro_panel.update_status(status_dict)
-        self.view_3d.update_status(status_dict)
+        # self.view_3d.update_status(status_dict)
         self.control_panel.update_status(status_dict)
