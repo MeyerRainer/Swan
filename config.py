@@ -113,7 +113,9 @@ PARALLEL_LINK_DIST = np.float64(0.090)
 
 CHAR_LEN = np.float64(0.2)  # Characteristic length, m
 
-BASE_OFFSET = np.array([0.1, 0.3, 0.0], dtype=np.float64)  # Offset from world origin to base at zero linear joints.
+# Sled total length (X-axis): 150mm
+# Sled rail center-to-center width (Y-axis): 118mm
+BASE_OFFSET = np.array([0.225, 0.380, 0.0], dtype=np.float64)  # Offset from world origin to base at zero linear joints.
 
 # Tool frame respect to J6 frame
 TOOL_OFS = np.array([

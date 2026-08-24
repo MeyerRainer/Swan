@@ -1,7 +1,7 @@
-# Blender 5.1.1 MTL File: 'None'
+# Blender 5.1.1 MTL File: 'L0.blend'
 # www.blender.org
 
-newmtl ABS_(White).003
+newmtl ABS_(White).005
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.964706 0.964706 0.952941
@@ -11,7 +11,7 @@ Ni 1.500000
 d 1.000000
 illum 1
 
-newmtl Aluminum_-_Satin.003
+newmtl Aluminum_-_Satin.005
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.960784 0.960784 0.964706
@@ -21,7 +21,7 @@ Ni 1.500000
 d 1.000000
 illum 1
 
-newmtl Opaque(63,63,63).003
+newmtl Opaque(63,63,63).005
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.247059 0.247059 0.247059
@@ -31,7 +31,7 @@ Ni 1.500000
 d 1.000000
 illum 1
 
-newmtl PEEK.003
+newmtl PEEK.005
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.600000 0.509804 0.368627
@@ -41,7 +41,7 @@ Ni 1.500000
 d 1.000000
 illum 1
 
-newmtl Stainless_Steel_-_Satin.003
+newmtl Stainless_Steel_-_Satin.005
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.796078 0.796078 0.796078
@@ -51,7 +51,7 @@ Ni 1.500000
 d 1.000000
 illum 1
 
-newmtl Steel_-_Satin.003
+newmtl Steel_-_Satin.005
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.627451 0.627451 0.627451
