@@ -54,7 +54,7 @@ class Pose:
 
     @classmethod
     def from_rot_mat(cls, pos: np.ndarray, R: np.ndarray) -> Pose:
-        SE3 = np.eye(3, dtype=np.float64)
+        SE3 = np.eye(4, dtype=np.float64)
         SE3[:3, 3] = pos
         SE3[:3, :3] = R
         return cls(SE3)
