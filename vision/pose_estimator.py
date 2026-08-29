@@ -1,25 +1,41 @@
-from typing import Optional
+""" Class for ArUco-based Pose-estimation.
 
+Author: Rainer Meyer, r.meyer494@gmail.com
+"""
+from dataclasses import dataclass
+from typing import Optional, List
 import cv2
 import numpy as np
-
 from robot_math.pose import Pose
+from vision.opencv_camera import CameraCalibration
 
-MARKER_LENGTH = 0.040
-MARKER_SEPARATION = 0.048
 
-class Detector:
+@dataclass
+class EstimatorParams:
+    camera_calibration: CameraCalibration
+    id1: int
+    id2: int
+    marker_size: float
+    marker_gap: float
 
-    def __init__(self, camera_matrix: np.ndarray, camera_dist: np.ndarray, id1: int, id2: int):
 
-        # Camera matrix and distortion coefficients.
-        self.camera_matrix: np.ndarray = camera_matrix
-        self.camera_dist: np.ndarray = camera_dist
+class PoseEstimator:
+
+    def __init__(self, params: EstimatorParams):
+
+        # Cameras intrinsic parameters.
+        self.camera_calibration: CameraCalibration = params.camera_calibration
+
+        # ArUco parameters.
+        self.ids: List[int] = [params.id1, params.id2]
+        self.marker_size: float = params.marker_size
+        self.marker_gap: float = params.marker_gap
 
         # ArUco fiducial dictionary and board.
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
-        self.board = cv2.aruco.GridBoard((1, 2), MARKER_LENGTH, MARKER_SEPARATION, self.aruco_dict, ids=np.array([[id1], [id2]]))
+        self.board = cv2.aruco.GridBoard((1, 2), self.marker_size, self.marker_gap, self.aruco_dict, ids=np.array(self.ids))
 
+        # ArUco detector and its parameters.
         self.detector_params = cv2.aruco.DetectorParameters()
         self.detector_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
         self.detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.detector_params)
@@ -29,24 +45,25 @@ class Detector:
         corners, ids, rejected = self.detector.detectMarkers(frame)
 
         if ids is not None:
+            mask = np.isin(ids.flatten(), self.ids)
+
+            corners_desired = [corners[i] for i in range(len(corners)) if mask[i]]
+            ids_desired = ids[mask]
+            print(corners_desired)
+            print(ids_desired)
+            if len(ids_desired) < 1:
+                return None
+
             # Match detected markers to our board layout
-            # objPoints = 3D object points, imgPoints = 2D image points
-            obj_points, img_points = self.board.matchImagePoints(corners, ids)
+            obj_points, img_points = self.board.matchImagePoints(corners_desired, ids_desired)
 
             if len(obj_points) > 0:
-                print(f"Object points: {obj_points}")
-                # print(f"Found {len(obj_points)} object points.")
-                ret, r_vec, t_vec = cv2.solvePnP(obj_points, img_points, self.camera_matrix, self.camera_dist, flags=cv2.SOLVEPNP_IPPE)
+                ret, r_vec, t_vec = cv2.solvePnP(obj_points, img_points, self.camera_calibration.matrix,
+                                                 self.camera_calibration.distortion, flags=cv2.SOLVEPNP_IPPE)
                 if ret and t_vec[2] > 0:  # Reject behind the camera pose
-                    # x, y, z = t_vec.flatten()
-                    # rx, ry, rz = r_vec.flatten()
-                    R, _ = np.ndarray = cv2.Rodrigues(r_vec)
-                    pose: Pose = Pose.from_rot_mat(pos=t_vec, R=R)
-                    # print(f"Detector, Pose: X: {x:.3f}\tY: {y:.3f}\tZ: {z:.3f}\tRX: {rx:.3f}\tRY: {ry:.3f}\tRZ: {rz:.3f}")
-                    return Pose, corners, ids
-                else:
-                    print(f"Return value: {ret}")
-                    if t_vec[2] < 0:
-                        print(f"Pose behind the camera")
-
+                    # Rotation matrix from rotation vector representation.
+                    R, _ = cv2.Rodrigues(r_vec)
+                    # Detected ArUco's in camera frame, i.e., pose of ArUco with respect to camera
+                    marker_pose: Pose = Pose.from_rot_mat(t_vec.flatten(), R)  # camera2aruco
+                    return marker_pose
         return None

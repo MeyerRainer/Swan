@@ -77,6 +77,11 @@ class OpenCVCamera:
         return frame
 
     def calibrate(self, n_corners: Tuple[int, int], image_path: str) -> bool:
+        """ Normal OpenCV camera calibration. Find camera matrix (intrinsic params) and distortion coefficients.
+        :param n_corners: Number of inner corners in chessboard.
+        :param image_path: Path to calibration images.
+        :return: True if calibration successful.
+        """
         # N*3 tall matrix of object points (Real world points)
         grid = np.zeros((n_corners[0] * n_corners[1], 3), dtype=np.float32)
 
@@ -93,9 +98,6 @@ class OpenCVCamera:
         num_processed_images: int = 0
 
         for f_name in images:
-            if self.on_message:
-                self.on_message(f"Processing image {f_name}...")
-
             img = cv2.imread(f_name)
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -116,15 +118,16 @@ class OpenCVCamera:
         # rot_vecs, trans_vecs = rotation vectors, translation vectors (Orientation and position of chessboard)
         ret, mtx, dist, rot_vecs, trans_vecs = cv2.calibrateCamera(obj_points, img_points, img_size[::-1], None, None)
 
-        if ret < 1 and self.on_error:
-            self.on_error("Bad camera calibration.")
+        MAX_ERROR: float = 1.
+        if ret > MAX_ERROR and self.on_error:
+            self.on_error(f"Bad camera calibration. (Error = {ret}, maximum allowable error = {MAX_ERROR} pixels.)")
             return False
 
         self._calibration.matrix = mtx
         self._calibration.distortion = dist
         self._calibration.quality = ret
         if self.on_message:
-            self.on_message(f"Camera successfully calibrated with return value {ret}. Processed {num_processed_images}/{num_images} images.")
+            self.on_message(f"Camera successfully calibrated with return value {ret:3f}. Processed {num_processed_images}/{num_images} images.")
 
         return True
 

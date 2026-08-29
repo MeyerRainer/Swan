@@ -87,15 +87,6 @@ class ApplicationController(QObject):
         self.main_window.viewport_tabs.currentChanged.connect(self.on_viewport_tab_change)
         self.main_window.view_scene.renderer.root_node = self.app_context.scene.root_node
 
-        # =========================================== Vision =============================================
-        # GUI -> Context
-        # Context -> GUI
-        self.app_context.vision_sys.sgn_error.connect(self.main_window.terminal.write)
-        self.app_context.vision_sys.sgn_message.connect(self.main_window.terminal.write)
-        self.app_context.vision_sys.sgn_processed_frame.connect(self.main_window.view_camera.show_frame)
-        self.app_context.vision_sys.sgn_raw_frame.connect(self.main_window.view_camera.show_frame)
-
-
         # ======================================== Program panel =========================================
         # GUI -> Context
         self.main_window.program_panel.directory_changed.connect(self.main_window.save_last_directory)
@@ -117,9 +108,15 @@ class ApplicationController(QObject):
         # ========================================= Vision panel =========================================
         # GUI -> Context
         # self.main_window.vision_pan
+        self.main_window.vision_panel.sgn_camera_calibration.connect(self.app_context.vision_sys.camera_calibration_intrinsic)
+        self.main_window.vision_panel.sgn_find_camera_pose.connect(self.app_context.vision_sys.camera_calibration_extrinsic)
 
         # Context -> GUI
         # self.app_context.vision_manager.camera.sgn_write_terminal.connect(self.main_window.terminal.write)
+        self.app_context.vision_sys.sgn_message.connect(self.main_window.terminal.write)
+        self.app_context.vision_sys.sgn_error.connect(self.main_window.terminal.write)
+        self.app_context.vision_sys.sgn_processed_frame.connect(self.main_window.view_camera.show_frame)
+        # self.app_context.vision_sys.sgn_raw_frame.connect(self.main_window.view_camera.show_frame)
 
         # ========================================= Teach panel ==========================================
 

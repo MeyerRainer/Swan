@@ -12,6 +12,8 @@ class VisionWidget(QWidget):
 
     sgn_write_terminal = pyqtSignal(str)
     sgn_open_file = pyqtSignal()
+    sgn_camera_calibration = pyqtSignal()
+    sgn_find_camera_pose = pyqtSignal()
     # sgn_directory_changed = pyqtSignal(str)
     # sgn_open_file = pyqtSignal(str)
 
@@ -21,6 +23,8 @@ class VisionWidget(QWidget):
 
         self.allowed_extensions = ["jpg, png"]
         self.load_images_button = QPushButton("Load Images")
+        self.calibrate_camera_button = QPushButton("Calibrate Camera")
+        self.locate_camera_button = QPushButton("Locate Camera")
 
         self.init_ui()
         self.connect_ui()
@@ -31,21 +35,25 @@ class VisionWidget(QWidget):
     def init_ui(self):
         layout =  QVBoxLayout()
 
-        group_teach = QGroupBox("Camera Calibration")
-        layout_teach = QVBoxLayout()
+        group = QGroupBox("Camera Calibration")
+        v_box = QVBoxLayout()
 
-        lower = QHBoxLayout()
-        lower.addWidget(self.load_images_button)
+        h_calibration = QHBoxLayout()
+        h_calibration.addWidget(self.load_images_button)
+        h_calibration.addWidget(self.calibrate_camera_button)
+        h_calibration.addWidget(self.locate_camera_button)
+        v_box.addLayout(h_calibration)
 
-        layout_teach.addLayout(lower)
-        group_teach.setLayout(layout_teach)
-
-        layout.addWidget(group_teach)
+        group.setLayout(v_box)
+        layout.addWidget(group)
 
         self.setLayout(layout)
 
     def connect_ui(self):
         self.load_images_button.clicked.connect(self.sgn_write_terminal.emit)
+        self.calibrate_camera_button.clicked.connect(self.sgn_camera_calibration.emit)
+        self.locate_camera_button.clicked.connect(self.sgn_find_camera_pose.emit)
+
 
     # def open_file_dialog(self):
     #     # last_dir: str = self.settings.value("last_directory", QDir.homePath())

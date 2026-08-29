@@ -124,8 +124,15 @@ TOOL_OFS = np.array([
     [0., 0., 1., 0.000],
     [0., 0., 0., 1.000]], dtype=np.float64)
 # TOOL_OFS[:3, :3] = utils.zyz2rot_mat(np.array([0, -math.pi/4, 0]), dtype=np.float64)
-
 INV_TOOL_OFS = np.linalg.inv(TOOL_OFS)
+
+# Calibration board w.r.t. world frame. (World to cal.board. transformation)
+WORLD2CAL_BOARD = np.array([
+    [1., 0., 0., 0.420],
+    [0., -1., 0., 0.140],
+    [0., 0., -1., 0.001],
+    [0., 0., 0., 1.]], dtype=np.float64)
+CAL_BOARD2WORLD = np.linalg.inv(WORLD2CAL_BOARD)
 
 # GUI Defaults
 LINEAR_SPEED_MIN: int = 10  # mm/min

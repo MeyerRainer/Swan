@@ -30,12 +30,15 @@ class CameraWidget(QWidget):
     def show_frame(self, frame: np.ndarray):
         dimensions = frame.shape
         height, width = dimensions[0], dimensions[1]
-        if len(dimensions) < 3:
-            channels = 1
-        else:
-            channels = dimensions[2]
+        # if len(dimensions) < 3:
+        #     channels = 1
+        # else:
+        #     channels = dimensions[2]
+        assert frame.shape[2] == 3
 
-        image = QImage(frame.data, width, height, channels*width, QImage.Format.Format_RGB888)
+        bytes_per_line = frame.strides[0]
+        image = QImage(frame.data, width, height, bytes_per_line, QImage.Format.Format_RGB888).rgbSwapped()
+
         self.current_pixmap = QPixmap.fromImage(image)
         self._update_pixmap()
 
