@@ -84,7 +84,7 @@ class ApplicationController(QObject):
         # self.terminal_panel.command_signal.connect(self.serial.send)  # Send to serial. First parse message.
 
         # ========================================== Viewport ============================================
-        self.main_window.viewport_tabs.currentChanged.connect(self.on_viewport_tab_change)
+        # self.main_window.viewport_tabs.currentChanged.connect(self.on_viewport_tab_change)
         self.main_window.view_scene.renderer.root_node = self.app_context.scene.root_node
 
         # ======================================== Program panel =========================================
@@ -110,6 +110,8 @@ class ApplicationController(QObject):
         # self.main_window.vision_pan
         self.main_window.vision_panel.sgn_camera_calibration.connect(self.app_context.vision_sys.camera_calibration_intrinsic)
         self.main_window.vision_panel.sgn_find_camera_pose.connect(self.app_context.vision_sys.camera_calibration_extrinsic)
+        self.main_window.vision_panel.sgn_game_reset.connect(self.app_context.vision_sys.ttt_board.reset)
+        self.main_window.vision_panel.sgn_execute_machine_move.connect(self.app_context.vision_sys.command_robot_sys)
 
         # Context -> GUI
         # self.app_context.vision_manager.camera.sgn_write_terminal.connect(self.main_window.terminal.write)

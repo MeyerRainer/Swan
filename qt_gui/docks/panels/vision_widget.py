@@ -14,6 +14,8 @@ class VisionWidget(QWidget):
     sgn_open_file = pyqtSignal()
     sgn_camera_calibration = pyqtSignal()
     sgn_find_camera_pose = pyqtSignal()
+    sgn_game_reset = pyqtSignal()
+    sgn_execute_machine_move = pyqtSignal()
     # sgn_directory_changed = pyqtSignal(str)
     # sgn_open_file = pyqtSignal(str)
 
@@ -25,6 +27,8 @@ class VisionWidget(QWidget):
         self.load_images_button = QPushButton("Load Images")
         self.calibrate_camera_button = QPushButton("Calibrate Camera")
         self.locate_camera_button = QPushButton("Locate Camera")
+        self.reset_game_button = QPushButton("Reset Game")
+        self.machine_move_button = QPushButton("Machine Execute")
 
         self.init_ui()
         self.connect_ui()
@@ -35,24 +39,34 @@ class VisionWidget(QWidget):
     def init_ui(self):
         layout =  QVBoxLayout()
 
-        group = QGroupBox("Camera Calibration")
-        v_box = QVBoxLayout()
-
+        group_camera_calibration = QGroupBox("Camera Calibration")
+        v_box_calibration = QVBoxLayout()
         h_calibration = QHBoxLayout()
         h_calibration.addWidget(self.load_images_button)
         h_calibration.addWidget(self.calibrate_camera_button)
         h_calibration.addWidget(self.locate_camera_button)
-        v_box.addLayout(h_calibration)
+        v_box_calibration.addLayout(h_calibration)
+        group_camera_calibration.setLayout(v_box_calibration)
+        layout.addWidget(group_camera_calibration)
 
-        group.setLayout(v_box)
-        layout.addWidget(group)
+        group_ttt_game = QGroupBox("Tic Tac Toe")
+        v_box_game = QVBoxLayout()
+        v_box_game.addWidget(self.reset_game_button)
+        v_box_game.addWidget(self.machine_move_button)
+        group_ttt_game.setLayout(v_box_game)
+        layout.addWidget(group_ttt_game)
 
         self.setLayout(layout)
 
     def connect_ui(self):
+        # Camera calibration.
         self.load_images_button.clicked.connect(self.sgn_write_terminal.emit)
         self.calibrate_camera_button.clicked.connect(self.sgn_camera_calibration.emit)
         self.locate_camera_button.clicked.connect(self.sgn_find_camera_pose.emit)
+
+        # Tic-tac-toe Game.
+        self.reset_game_button.clicked.connect(self.sgn_game_reset.emit)
+        self.machine_move_button.clicked.connect(self.sgn_execute_machine_move)
 
 
     # def open_file_dialog(self):

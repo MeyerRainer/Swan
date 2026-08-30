@@ -8,12 +8,17 @@ from dataclasses import dataclass
 from typing import Optional, Tuple, Callable
 import glob
 
+from robot_math.pose import Pose
+
 
 @dataclass
 class CameraCalibration:
-    matrix: Optional[np.ndarray] = None
-    distortion: Optional[np.ndarray] = None
-    quality: Optional[float] = None
+    matrix: Optional[np.ndarray] = None         # Intrinsic parameters.
+    distortion: Optional[np.ndarray] = None     # Distortion coefficients.
+    quality: Optional[float] = None             # Quality of calibration.
+    extrinsic: Optional[Pose] = None            # Camera pose w.r.t. world.
+    r_vec: Optional[np.ndarray] = None          # Camera rotation w.r.t. world.
+    t_vec: Optional[np.ndarray] = None          # Camera translation w.r.t. world.
 
 
 class OpenCVCamera:

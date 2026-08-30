@@ -177,7 +177,7 @@ class ASWKinematics:
         :param elbow_down: False: Elbow angled upwards. True: Elbow angled downwards.
         :param wrist_flip: J5 < 0 or J5 > 0. Currently, not in use. Closer solution is chosen.
         :param jnt_correction: Additional correction vector based on kinematic calibration.
-        :return: Tuple[IkSolution, jnt_coords].
+        :return: IkSolution.
         """
         # DH-parameters, manipulator dimension constants
         a1, a2, a3 = self.DH[0]['a'], self.DH[1]['a'], self.DH[2]['a']
@@ -265,7 +265,7 @@ class ASWKinematics:
         wrist_solutions = [wrist_sol_1, wrist_sol_2]
         wrist_solutions.sort(key=lambda x: np.linalg.norm(x-prev_jnt_vec[3:6]))
         theta4, theta5, theta6 = 0., 0., 0.
-        limit_trigger = JointLimit.CLEAR
+        limit_trigger: JointLimit = JointLimit.CLEAR
         for sol in wrist_solutions:
             theta4 = sol[0]
             if not JOINT_LIMITS['J4_MIN'] <= np.rad2deg(theta4) <= JOINT_LIMITS['J4_MAX']:
@@ -283,7 +283,7 @@ class ASWKinematics:
                 break
 
         # print(f"IK solution: {np.rad2deg(np.array((theta1, theta2, theta3, theta4, theta5, theta6)))} degrees.")
-        if limit_trigger is not JointLimit.CLEAR:
+        if limit_trigger != JointLimit.CLEAR:
             return IkSolution(joint_limits=limit_trigger)
 
         return IkSolution(joint_solution=np.array([theta1, theta2, theta3, theta4, theta5, theta6]), success=True)
@@ -408,6 +408,7 @@ class ASWKinematics:
         :param jnt_vec: Absolute joint coordinates in radians.
         :return:
         """
+        # TODO: Consider autodifferentiation?
         # Parameter space
         a1, a2, a3, a4, a5, a6 = self.DH[0]['a'], self.DH[1]['a'], self.DH[2]['a'], self.DH[3]['a'], self.DH[4]['a'], self.DH[5]['a']
         al1, al2, al3, al4, al5, al6 = self.DH[0]['alpha'], self.DH[1]['alpha'], self.DH[2]['alpha'], self.DH[3]['alpha'], self.DH[4]['alpha'], self.DH[5]['alpha']

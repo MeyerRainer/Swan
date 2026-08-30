@@ -3,7 +3,7 @@
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot, QTimer
-from vision.opencv_camera import OpenCVCamera
+from vision.opencv_camera import OpenCVCamera, CameraCalibration
 
 
 class CameraDriver(QObject):
@@ -24,6 +24,10 @@ class CameraDriver(QObject):
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._capture)
+
+    @property
+    def calibration(self) -> CameraCalibration:
+        return self.camera.calibration
 
     @pyqtSlot()
     def start(self) -> None:

@@ -2,15 +2,21 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
+import types
+
 from PyQt6.QtCore import pyqtSlot, pyqtSignal, QObject, QThread, Qt
+import time
 from typing import Optional
 import threading
 import numpy as np
 
-import config
 from robot_math.pose import Pose
+from tic_tac_toe.ttt_board import TTTBoard, MachineMoveRequest
+from tic_tac_toe.ttt_detector import DetectorOutput, TTTDetector
 from vision.camera_driver import CameraDriver
-from vision.pose_estimator import PoseEstimator, EstimatorParams
+from vision.pose_estimator import PoseEstimator, PoseEstimatorParams, PoseEstimatorOutput
+from vision.frame_overlay import Overlay
+import config
 
 
 class VisionSystem(QObject):
@@ -41,20 +47,22 @@ class VisionSystem(QObject):
         self._camera_frame_available: bool = False
         self._camera_calibrated_intrinsic: bool = False
         self._camera_calibrated_extrinsic: bool = False
-        # self._camera_thread.finished.connect(self._camera_driver.deleteLater)
 
         self._camera_driver.sgn_frame_received.connect(self._receive_frame)
-
         self._camera_driver.sgn_error.connect(self.sgn_error.emit)
         self._camera_driver.sgn_message.connect(self.sgn_message.emit)
 
-        # Pose estimators
+        # Pose estimations
         self.game_board_pose_estimator: PoseEstimator = PoseEstimator(
-            EstimatorParams(camera_calibration=self._camera_driver.camera.calibration,
-                            id1=4, id2=42, marker_size=0.040, marker_gap=0.048))
+            PoseEstimatorParams(camera_calibration=self._camera_driver.camera.calibration,
+                                id1=4, id2=42, marker_size=0.040, marker_gap=0.048))
         self.camera_pose_estimator: PoseEstimator = PoseEstimator(
-            EstimatorParams(camera_calibration=self._camera_driver.camera.calibration,
-                            id1=5, id2=43, marker_size=0.040, marker_gap=0.040))
+            PoseEstimatorParams(camera_calibration=self._camera_driver.camera.calibration,
+                                id1=5, id2=43, marker_size=0.040, marker_gap=0.040))
+
+        self.ttt_detector: TTTDetector = TTTDetector("models/tic_tac_toe/train-7/best.onnx")  # YOLO-based detector.
+        self.ttt_board: TTTBoard = TTTBoard()       # Game board.
+        self.frame_overlay = Overlay()              # Frame overlay.
 
         # Vision processing
         self._latest_frame = None
@@ -79,16 +87,20 @@ class VisionSystem(QObject):
             return
 
         # Calibration board with respect to camera pose
-        camera2aruco: Pose = self.camera_pose_estimator.estimate_pose(frame=frame)
-        if camera2aruco is None:
+        pose_estimation: PoseEstimatorOutput = self.camera_pose_estimator.estimate_pose(frame=frame)
+        if pose_estimation is None:
             self.sgn_message.emit("Could not detect calibration markers.")
             return
 
+        aruco2camera: Pose = pose_estimation.marker_pose.inverse()
+
         # Camera with respect to world pose.
-        self.world2camera = Pose(config.WORLD2CAL_BOARD).compose(camera2aruco.inverse())
+        self.world2camera = Pose(config.WORLD2CAL_BOARD).compose(aruco2camera)
+        # self._camera_driver.calibration.extrinsic = self.world2camera
+        self._camera_driver.camera.calibration.extrinsic = self.world2camera
         self.sgn_message.emit(f"Calibration successful.")
-        self.sgn_message.emit(f"Camera position in world frame: {1000*self.world2camera.position} millimeters.")
-        self.sgn_message.emit(f"Camera ZYZ-Euler in world frame: {np.rad2deg(self.world2camera.zyz_euler)} degrees.")
+        self.sgn_message.emit(f"Camera position in world frame: {np.round(1000*self.world2camera.position, 1)} millimeters.")
+        self.sgn_message.emit(f"Camera ZYZ-Euler in world frame: {np.round(np.rad2deg(self.world2camera.zyz_euler), 1)} degrees.")
 
     def start(self) -> None:
         if self._camera_thread.isRunning():
@@ -124,10 +136,6 @@ class VisionSystem(QObject):
             self._latest_frame = frame
             self._condition.notify_all()
 
-    def _get_latest_frame(self) -> Optional[np.ndarray]:
-        with self._condition:
-            return self._latest_frame
-
     def _processing_loop(self) -> None:
         while True:
             with self._condition:
@@ -139,24 +147,45 @@ class VisionSystem(QObject):
 
                 frame = self._latest_frame
                 self._camera_frame_available = False
-                # frame: np.ndarray = self._get_latest_frame()
-                # self._latest_frame = None
 
             try:
-                annotated, markers, pose = self._run_pipeline(frame)
+                # Game board pose detection.
+                camera2board: PoseEstimatorOutput = self.game_board_pose_estimator.estimate_pose(frame)
+                # Tic-tac-toe detection.
+                game_state_detection: DetectorOutput = self.ttt_detector.detect(frame)
 
-                if markers is not None:
-                    self.markers_detected.emit(markers)
+                # Frame annotation.
+                annotated: np.ndarray = self.frame_overlay.draw(frame=frame,
+                                                                camera_calibration=self._camera_driver.camera.calibration,
+                                                                ttt_detection=game_state_detection,
+                                                                board_pose_estimation=camera2board)
 
-                if pose is not None:
-                    self.pose_estimated.emit(pose)
+                # Update game
+                if camera2board is not None and game_state_detection is not None and self._camera_driver.camera.calibration.extrinsic is not None:
+                    self.ttt_board.pose = self._camera_driver.camera.calibration.extrinsic.compose(camera2board.marker_pose)  # World2board.
 
-                self.processed_frame.emit(annotated)
+                    machine_move_request = self.ttt_board.update(
+                        camera_calibration=self._camera_driver.camera.calibration,
+                        ttt_detection=game_state_detection,
+                        board_pose_estimation = camera2board
+                    )
+                    # if machine_move_request is not None:
+                    #     self.sgn_machine_move_request.emit(machine_move_request)
+
+                self.sgn_processed_frame.emit(annotated)
 
             except Exception as exc:
-                # self.sgn_error.emit(f"Vision processing error: {exc}")
+                tr = exc.__traceback__
+                # self.sgn_error.emit(f"Vision processing error: {exc.with_traceback(exc.__traceback__)}")
+                raise RuntimeError().with_traceback(tr)
                 # TODO: Implement
                 self.sgn_processed_frame.emit(frame)
+
+            finally:
+                time.sleep(0.5)  # Limit speed to 5Hz
+
+    def command_robot_sys(self):
+        ...
 
     def _run_pipeline(self, frame: np.ndarray):
         # frame = self._undistort(frame)

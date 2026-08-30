@@ -28,6 +28,10 @@ class ApplicationContext:
         self.scene.print_tree()
 
         self.connect_signals()
+        self.init_application_context()
+
+    def init_application_context(self):
+        self.vision_sys.start()
 
     def connect_signals(self):
         """ Connections between application context components
