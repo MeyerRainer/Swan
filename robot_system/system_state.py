@@ -7,8 +7,8 @@ planned: State based on trajectory planners.
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
 
-from backend.manipulator_state import ManipulatorState, ManipulatorStateObject
-from backend.linear_axis_state import LinearAxisState, LinearAxisStateObject
+from robot_system.manipulator_state import ManipulatorState, ManipulatorStateObject
+from robot_system.linear_axis_state import LinearAxisState, LinearAxisStateObject
 from config import N_REV_JNT, N_LIN_JNT, N_JNT
 
 import numpy as np

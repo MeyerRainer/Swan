@@ -3,8 +3,8 @@
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
 import config
-from backend.kinematics.trivial_kinematics_1d import TrivKins1D
-from backend.linear_axis_state import LinearAxisState
+from robot_system.kinematics.trivial_kinematics_1d import TrivKins1D
+from robot_system.linear_axis_state import LinearAxisState
 
 import numpy as np
 

@@ -3,9 +3,8 @@
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from application_settings import ApplicationSettings
-from qt_gui.viewport.scene import *
-from backend.gc_serial import GCSerial
-from backend.robot_system import RobotSystem
+from robot_system.gc_serial import GCSerial
+from robot_system.robot_system import RobotSystem
 from qt_gui.viewport.scene.scene import SceneGraph
 from vision.vision_system import VisionSystem
 from robot_program.program_manager import ProgramManager
@@ -24,8 +23,7 @@ class ApplicationContext:
         self.scene = SceneGraph(robot_sys=self.robot_sys, root=None, dir_path="scene/")
         self.planner = TrajectoryPlanner()
         self.program_manager = ProgramManager(planner=self.planner)
-        # print(f"App context: Number of scene nodes: {self.scene.size()}")
-        self.scene.print_tree()
+        # self.scene.print_tree()
 
         self.connect_signals()
         self.init_application_context()

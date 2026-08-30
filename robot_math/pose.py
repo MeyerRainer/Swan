@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from typing import Tuple
 
-import utils
 from robot_math.quaternion import Quaternion
+from robot_math.zyz_euler import ZYZEuler
 import numpy as np
 
 
@@ -48,10 +48,10 @@ class Pose:
         return cls(SE3)
 
     @classmethod
-    def from_zyz_euler(cls, pos: np.ndarray, zyz: np.ndarray) -> Pose:
+    def from_zyz_euler(cls, pos: np.ndarray, zyz: ZYZEuler) -> Pose:
         SE3 = np.eye(4, dtype=np.float64)
         SE3[:3, 3] = pos
-        SE3[:3, :3] = utils.zyz2rot_mat(zyz)
+        SE3[:3, :3] = zyz.rot_mat
         return cls(SE3)
 
     @classmethod
@@ -74,9 +74,10 @@ class Pose:
     def rot_mat(self) -> np.ndarray:
         return self.pose[:3, :3]
 
+    # Pose, vision_sys, DRO, scene
     @property
-    def zyz_euler(self) -> np.ndarray:
-        return utils.rot2zyz(self.pose[:3, :3])[0]
+    def zyz_euler(self) -> ZYZEuler:
+        return ZYZEuler.from_rot_mat(self.pose[:3, :3])
 
     @property
     def SE3(self) -> np.ndarray:
@@ -141,10 +142,10 @@ class Pose:
 
     # Set Orientation using ZYZ Euler angles.
     @zyz_euler.setter
-    def zyz_euler(self, zyz: np.ndarray) -> None:
+    def zyz_euler(self, zyz: ZYZEuler) -> None:
         if zyz.shape != (3,):
             raise ValueError(f"Expected shape (3,), got {zyz.shape} instead.")
-        self.pose[:3, :3] = utils.zyz2rot_mat(zyz)
+        self.pose[:3, :3] = zyz.rot_mat
 
     # Set position and orientation using SE3 transformation matrix.
     @SE3.setter

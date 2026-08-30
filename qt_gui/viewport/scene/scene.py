@@ -8,7 +8,7 @@ from typing import Optional, Any, Dict
 from pathlib import Path
 
 import config
-from backend.robot_system import RobotSystem
+from robot_system.robot_system import RobotSystem
 from qt_gui.viewport.scene.visuals.mesh import MeshObject, MeshSpecs
 from qt_gui.viewport.scene.visuals.ellipsoid import EllipsoidSpecs, Ellipsoid
 from qt_gui.viewport.gizmo.gizmo import Gizmo

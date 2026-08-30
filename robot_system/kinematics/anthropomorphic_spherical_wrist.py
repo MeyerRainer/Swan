@@ -5,12 +5,11 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from dataclasses import dataclass, field
 from enum import Enum, auto
-import numpy as np
 from config import *
 import config
-import utils
 from robot_math.pose import Pose
-from typing import Tuple, List, Optional, Literal, Any, Dict
+from robot_math.zyz_euler import ZYZEuler
+from typing import List, Dict
 
 
 class Singularity(Enum):
@@ -258,8 +257,8 @@ class ASWKinematics:
         pose_wrist_rot_mat = pose_arm_inverted @ wrist_pose[:3, :3]
 
         # Convert to ZYZ Euler angles and checking limits.
-        wrist_sol_1, wrist_singularity_1 = utils.rot2zyz(pose_wrist_rot_mat, phi_prev=prev_jnt_vec[3], psi_prev=prev_jnt_vec[5], flip=True)
-        wrist_sol_2, wrist_singularity_2 = utils.rot2zyz(pose_wrist_rot_mat, phi_prev=prev_jnt_vec[3], psi_prev=prev_jnt_vec[5], flip=False)
+        wrist_sol_1: ZYZEuler = ZYZEuler.from_rot_mat(pose_wrist_rot_mat, phi_prev=prev_jnt_vec[3], psi_prev=prev_jnt_vec[5], flip=True)
+        wrist_sol_2: ZYZEuler = ZYZEuler.from_rot_mat(pose_wrist_rot_mat, phi_prev=prev_jnt_vec[3], psi_prev=prev_jnt_vec[5], flip=False)
 
         # Check wrist joints solutions and prefer the solution with less distance in joint space.
         wrist_solutions = [wrist_sol_1, wrist_sol_2]

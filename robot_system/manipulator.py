@@ -9,11 +9,11 @@ import config
 from config import *
 from robot_math.pose import Pose
 from robot_math.quaternion import Quaternion
-from backend.manipulator_state import ManipulatorState
-from backend.kinematics.anthropomorphic_spherical_wrist import *
+from robot_system.manipulator_state import ManipulatorState
+from robot_system.kinematics.anthropomorphic_spherical_wrist import *
 
 from math import sqrt, fabs
-from typing import Tuple
+from typing import Tuple, Optional
 import numpy as np
 from numpy import linalg as LA
 

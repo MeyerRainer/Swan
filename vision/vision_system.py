@@ -100,7 +100,7 @@ class VisionSystem(QObject):
         self._camera_driver.camera.calibration.extrinsic = self.world2camera
         self.sgn_message.emit(f"Calibration successful.")
         self.sgn_message.emit(f"Camera position in world frame: {np.round(1000*self.world2camera.position, 1)} millimeters.")
-        self.sgn_message.emit(f"Camera ZYZ-Euler in world frame: {np.round(np.rad2deg(self.world2camera.zyz_euler), 1)} degrees.")
+        self.sgn_message.emit(f"Camera ZYZ-Euler in world frame: {np.round(np.rad2deg(self.world2camera.zyz_euler.array), 1)} degrees.")
 
     def start(self) -> None:
         if self._camera_thread.isRunning():

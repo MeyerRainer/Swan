@@ -5,9 +5,8 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 from typing import Tuple
 from PyQt6.QtCore import QObject
 import numpy as np
-import time
 
-import utils
+from robot_math import utils
 
 
 class ApplicationController(QObject):

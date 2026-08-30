@@ -233,10 +233,10 @@ class DROWidget(QWidget):
         frame_orientation = self.frame_select_orientation.currentText()
         if frame_orientation == 'World':
             quaternion: Quaternion = status['ops_coords_world'].quaternion
-            zyz: np.ndarray = status['ops_coords_world'].zyz_euler
+            zyz: np.ndarray = status['ops_coords_world'].zyz_euler.array
         elif frame_orientation == "Base":
             quaternion: Quaternion = status['ops_coords_base'].quaternion
-            zyz: np.ndarray = status['ops_coords_base'].zyz_euler
+            zyz: np.ndarray = status['ops_coords_base'].zyz_euler.array
         elif frame_orientation == "Tool":
             quaternion = Quaternion.identity()
             zyz: np.ndarray = np.zeros(3)

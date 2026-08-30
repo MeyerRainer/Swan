@@ -3,20 +3,17 @@
 Author: Rainer Meyer, rot.meyer494@gmail.com
 """
 import config
-from backend.manipulator import Manipulator
-from backend.linear_axis import LinearAxis
-from backend.g_code_writer import GCodeWriter
-from backend.system_state import SystemState, ControllerState
+from robot_system.manipulator import Manipulator
+from robot_system.linear_axis import LinearAxis
+from robot_system.g_code_writer import GCodeWriter
+from robot_system.system_state import SystemState, ControllerState
 from robot_math.pose import Pose
 from config import *
-import utils
+from robot_math import utils
 
-from typing import Tuple
 import numpy as np
 import numpy.linalg as LA
 from PyQt6.QtCore import QObject, pyqtSignal
-
-from robot_math.quaternion import Quaternion
 
 
 class RobotSystem(QObject):
@@ -310,8 +307,8 @@ class RobotSystem(QObject):
         # delta_t = 0.1
         alpha = 0.95
         delta_x = LA.norm(tool_wrt_base.position - self.previous_pose.position)
-        speed_linear: float = alpha*utils.m_s2mm_min(delta_x / delta_t) + (1-alpha)*self.speed_linear_prev
-        speed_angular: float = alpha*utils.rad_sec2deg_min(abs(tool_wrt_base.quaternion.angle(self.previous_pose.quaternion)) / delta_t) + (1-alpha)*self.speed_angular_prev
+        speed_linear: float = alpha * utils.m_s2mm_min(delta_x / delta_t) + (1 - alpha) * self.speed_linear_prev
+        speed_angular: float = alpha * utils.rad_sec2deg_min(abs(tool_wrt_base.quaternion.angle(self.previous_pose.quaternion)) / delta_t) + (1 - alpha) * self.speed_angular_prev
         self.speed_linear_prev, self.speed_angular_prev = speed_linear, speed_angular
 
         self.previous_pose = tool_wrt_base
