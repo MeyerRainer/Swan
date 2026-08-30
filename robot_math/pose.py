@@ -4,6 +4,8 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from __future__ import annotations
 
+from typing import Tuple
+
 import utils
 from robot_math.quaternion import Quaternion
 import numpy as np
@@ -80,6 +82,20 @@ class Pose:
     def SE3(self) -> np.ndarray:
         return self.pose.copy()
 
+    @property
+    def rodrigues(self) -> Tuple[np.ndarray, np.ndarray]:
+        # Rodrigues formula
+        R = self.rot_mat
+        cos_theta: np.float64 = np.clip(0.5 * (np.linalg.trace(R) - 1), -1, 1)
+        theta: np.float64 = np.acos(cos_theta)
+        k: np.ndarray = np.array([R[2, 1] - R[1, 2], R[0, 2] - R[2, 0], R[1, 0] - R[0, 1]], dtype=np.float64).reshape(3, 1)
+        k *=  0.5 / np.sin(theta)
+        r_vec: np.ndarray = theta * k
+        t_vec: np.ndarray = np.asarray(self.position, dtype=np.float64).reshape(3, 1)
+
+        return r_vec, t_vec
+
+
     # ======================================== Setters =======================================
     # Set position.
     @position.setter
@@ -136,6 +152,21 @@ class Pose:
         if T.shape != (4, 4):
             raise ValueError(f"Expected shape (4, 4), got {T.shape} instead.")
         self.pose = T.copy()
+
+    @rodrigues.setter
+    def rodrigues(self, rvec_tvec: Tuple[np.ndarray, np.ndarray]) -> None:
+        r = np.asarray(rvec_tvec[0], dtype=np.float64).reshape(3)
+        theta = np.linalg.norm(r)
+
+        if theta < 1e-12:
+            R = np.eye(3, dtype=np.float64)
+        else:
+            k = r / theta
+            K = np.array([[0.0, -k[2], k[1]], [k[2], 0.0, -k[0]], [-k[1], k[0], 0.0]])
+            R = np.eye(3) + np.sin(theta) * K + (1.0 - np.cos(theta)) * (K @ K)
+
+        self.position = rvec_tvec[1].reshape(3)
+        self.rot_mat = R
 
     # ======================================== Spatial operations =======================================
     # Rotate around x.
