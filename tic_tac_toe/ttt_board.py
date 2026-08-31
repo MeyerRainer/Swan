@@ -21,11 +21,12 @@ class GameBoard:
 
         # Size of one square grid cell.
         self.grid_size: float = 0.047
+
         # Offset from ArUco origo to cell's (0,0) origo.
-        # self.grid_offset: np.ndarray = np.array([0.082, 0.019])  # Offset from ArUco origo to first grid
-        self.grid_offset: np.ndarray = np.array([0.082 - self.grid_size / 2, 0.019 - self.grid_size / 2])  # Offset from ArUco origo to first grid
-        # self.grid_offset: np.ndarray = np.array([0.0585, -0.0005])  # Offset from ArUco origo to first grid. Physically measured.
-        self.world_pose: Pose = Pose.identity()  # Board pose in world frame.
+        self.grid_offset: np.ndarray = np.array([0.082 - self.grid_size / 2, 0.019 - self.grid_size / 2])
+
+        # Board pose in world frame.
+        self.world_pose: Pose = Pose.identity()
 
     @property
     def pose(self) -> Pose:
@@ -36,31 +37,24 @@ class GameBoard:
         self.world_pose = pose
 
     @staticmethod
-    def pixel2board(px: int, py: int, cam_cal: CameraCalibration, board_pose: PoseEstimatorOutput) -> Optional[np.ndarray]:
-        """ Based on an image of the game board, this function returns the XY-coordinates in the board frame in meters.
+    def image2board(px: int, py: int, cam_cal: CameraCalibration, board_pose: PoseEstimatorOutput) -> Optional[np.ndarray]:
+        """ Based on an image of the game board, this function returns the XYZ-coordinates in the board frame in meters.
         :param px: Pixel coordinates X.
         :param py: Pixel coordinates Y.
-        :param board_pose:
+        :param board_pose: Board pose with respect to world frame.
         :param cam_cal: Camera calibration.
         """
+        # Camera w.r.t. board transformation.
+        board2camera: Pose = board_pose.marker_pose.inverse()
+        # Camera -> board rotation matrix.
+        R_cam2board: np.ndarray = board2camera.rot_mat
+        # Camera -> board translation vector.
+        transl_cam2board: np.ndarray = board2camera.position.reshape(3, 1)
 
-        # TODO: Fix name. camera2board
-        board2camera: Pose = board_pose.marker_pose
-
-        # Camera with respect to board rotation matrix.
-        R_board2cam: np.ndarray = board2camera.rot_mat
-
-        # Camera w.r.t. board translation as column vector.
-        transl_board2cam: np.ndarray = board2camera.position.reshape(3, 1)
-
-        # Inverse. (camera to board transformation)
-        R_cam2board: np.ndarray = R_board2cam.T
-        transl_cam2board: np.ndarray = -R_cam2board @ transl_board2cam
-
-        # Pixel space to camera space transformation. Undistort pixel.
+        # Pixel space to camera space transformation. Undistort pixel. Shape=(1, 1, 2)
         pixel_coords: np.ndarray = np.array([[[float(px), float(py)]]], dtype=np.float32)
-        pixel_coords_undistorted: np.ndarray = cv2.undistortPoints(src=pixel_coords, cameraMatrix=cam_cal.matrix,
-                                                                   distCoeffs=cam_cal.distortion)
+        pixel_coords_undistorted: np.ndarray = cv2.undistortPoints(
+            src=pixel_coords, cameraMatrix=cam_cal.matrix, distCoeffs=cam_cal.distortion)
         # Pixel coordinates as a normalized ray in camera frame.
         camera_ray: np.ndarray = np.array([pixel_coords_undistorted[0, 0, 0], pixel_coords_undistorted[0, 0, 1], 1.0]).reshape(3, 1)
 
@@ -74,7 +68,7 @@ class GameBoard:
         s = -transl_cam2board[2, 0] / board_ray[2, 0]
         p_board = transl_cam2board + s * board_ray
 
-        return p_board.flatten()  # Returns [X, Y, Z] where Z should be close to zero
+        return p_board.flatten()  # Returns [X, Y, Z] where Z should be close to zero.
 
 
 class TTTBoard(GameBoard):
@@ -100,14 +94,31 @@ class TTTBoard(GameBoard):
         :return: Tuple of ints in range [0, 2] for grid location
         """
         xy: np.ndarray = np.array([x, y]) - self.grid_offset
-        grid_x: int = int(np.floor(xy[0] / self.grid_size))
-        grid_y: int = int(np.floor(xy[1] / self.grid_size))
-        # Point out of grid
-        if not (0 <= grid_x <= 2 and 0 <= grid_y <= 2):
-            print(f"grid_x: {grid_x}\tgrid_y: {grid_y}\ty: {xy[1]:.3f}")
+        i: int = int(np.floor(xy[0] / self.grid_size))
+        j: int = int(np.floor(xy[1] / self.grid_size))
+
+        # Point out of grid.
+        if not (0 <= i <= 2 and 0 <= j <= 2):
             return None
 
-        return grid_x, grid_y
+        return i, j
+
+    def grid2board(self, i: int, j: int) -> np.ndarray:
+        """ Inputs grid location and outputs XYZ-coordinates in board frame as meters.
+        :param i: Grid number in x-direction in range [0, 2]
+        :param j: Grid number in y-direction in range [0, 2]
+        :return: XYZ coordinates of given grid in board frame, meters.
+        """
+        x: float = self.grid_offset[0] + (0.5 + i) * self.grid_size
+        y: float = self.grid_offset[1] + (0.5 + j) * self.grid_size
+        return np.array([x, y, 0.], dtype=np.float64)
+
+    def board2world(self, board_coords: np.ndarray):
+        """ Transforms 3D vector from board frame to world frame.
+        :param board_coords: XYZ coordinates in board frame, meters.
+        :return: XYZ coordinates in world frame, meters.
+        """
+        return self.world_pose.vector_mult(board_coords)
 
     def update(self, camera_calibration: CameraCalibration, ttt_detection: DetectorOutput, board_pose_estimation: PoseEstimatorOutput):
         """ Update gameboard based on detections.
@@ -129,14 +140,11 @@ class TTTBoard(GameBoard):
                 case _:
                     mark = ""
 
-            if mark not in self.MARKS:
-                print(f"Invalid mark.")
+            # Invalid or uninteresting mark, ignore.
+            if mark not in self.MARKS or mark == "Board":
                 continue
 
-            if mark == "Board":
-                continue
-
-            point_board_frame: np.ndarray = self.pixel2board(cx, cy, cam_cal=camera_calibration, board_pose=board_pose_estimation)
+            point_board_frame: np.ndarray = self.image2board(cx, cy, cam_cal=camera_calibration, board_pose=board_pose_estimation)
             if point_board_frame is None:
                 print(f"Could not compute board frame coordinates.")
                 continue
@@ -148,7 +156,7 @@ class TTTBoard(GameBoard):
 
             i, j = grid_coords[0], grid_coords[1]
             if not (0 <= i <= 2 and 0 <= j <= 2):
-                print(f"Out of board. (i={i}, j={j})")
+                print(f"TTT: Grid out of board. (i={i}, j={j})")
                 continue
 
             if self.board[i][j] != ' ':
@@ -178,7 +186,10 @@ class TTTBoard(GameBoard):
             self.players_turn = False
             machine_move = self.make_machine_move()
             if machine_move:
-                print(f"Machine move: X:{machine_move[0]}\tY:{machine_move[1]}")
+                board_coords: np.ndarray = self.grid2board(machine_move[0], machine_move[1])
+                world_coords: np.ndarray = self.board2world(board_coords)
+                print(f"Board coords: {board_coords}")
+                print(f"Machine move: X:{machine_move[0]}\tY:{machine_move[1]}. World coordinates: X:{world_coords[0]}\tY:{world_coords[1]}\tZ:{world_coords[2]}.")
             else:
                 print(f"Machine move solver failed.")
 

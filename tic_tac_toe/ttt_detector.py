@@ -23,20 +23,20 @@ class TTTDetector:
 
     def __init__(self, model_loc: str):
 
-        self.providers = [
-            ('CUDAExecutionProvider', {
-                'device_id': 0,  # Use the first GPU
-                'arena_extend_strategy': 'kNextPowerOfTwo',
-                'gpu_mem_limit': 2 * 1024 * 1024 * 1024,  # Optional: Limit to 2GB
-            }),
-            'CPUExecutionProvider'
-        ]
-        options = ort.SessionOptions()
-        options.log_severity_level = 0  # 0 = Verbose, 1 = Info, 2 = Warning, 3 = Error
+        # self.providers = [
+        #     ('CUDAExecutionProvider', {
+        #         'device_id': 0,  # Use the first GPU
+        #         'arena_extend_strategy': 'kNextPowerOfTwo',
+        #         'gpu_mem_limit': 2 * 1024 * 1024 * 1024,  # Optional: Limit to 2GB
+        #     }),
+        #     'CPUExecutionProvider'
+        # ]
+        # options = ort.SessionOptions()
+        # options.log_severity_level = 0  # 0 = Verbose, 1 = Info, 2 = Warning, 3 = Error
 
-        self.session = ort.InferenceSession(model_loc, sess_options=options, providers=self.providers)
-        print(f"Active providers: {self.session.get_providers()}")
-
+        # self.session = ort.InferenceSession(model_loc, sess_options=options, providers=self.providers)
+        # print(f"Active providers: {self.session.get_providers()}")
+        self.session = ort.InferenceSession(model_loc)
 
         self.input_name: Sequence[NodeArg] = self.session.get_inputs()[0].name
 

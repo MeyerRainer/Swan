@@ -169,7 +169,14 @@ class Pose:
         self.position = rvec_tvec[1].reshape(3)
         self.rot_mat = R
 
-    # ======================================== Spatial operations =======================================
+    # ===================================== Spatial operations ====================================
+    # Vector transform: R^3 -> R^3
+    def vector_mult(self, vec: np.ndarray) -> np.ndarray:
+        vec_in: np.ndarray = np.ones((4, 1), dtype=np.float64)
+        vec_in[:3, 0] = vec
+        vec_out: np.ndarray = self.SE3 @ vec_in
+        return vec_out[:3, 0].flatten()
+
     # Rotate around x.
     def rotate_x(self, angle: float, degrees=False, body_frame=True) -> None:
         R = np.eye(3)
