@@ -2,25 +2,16 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
-import time
 from dataclasses import dataclass
-
-import config
-from config import *
-from robot_math.pose import Pose
 from robot_math.quaternion import Quaternion
-from robot_system.manipulator_state import ManipulatorState
-from robot_system.kinematics.anthropomorphic_spherical_wrist import *
-
-from math import sqrt, fabs
+from robot_manipulator.manipulator_state import ManipulatorState
+from robot_manipulator.kinematics.anthropomorphic_spherical_wrist import *
 from typing import Tuple, Optional
 import numpy as np
-from numpy import linalg as LA
 
-np.set_printoptions(precision=3, suppress=True)
 
 class JointSolution(Enum):
-    SUCCESS = auto()
+    OK = auto()
     J1_NEGATIVE_LIMIT = auto()
     J1_POSITIVE_LIMIT = auto()
     J2_NEGATIVE_LIMIT = auto()
@@ -36,7 +27,7 @@ class JointSolution(Enum):
 
 
 class MotorSolution(Enum):
-    SUCCESS = auto()
+    OK = auto()
     M1_NEGATIVE_LIMIT = auto()
     M1_POSITIVE_LIMIT = auto()
     M2_NEGATIVE_LIMIT = auto()
@@ -51,13 +42,18 @@ class MotorSolution(Enum):
     M6_POSITIVE_LIMIT = auto()
 
 
+class IkSolution(Enum):
+    OK = auto()
+
 
 @dataclass
 class MotionQueryResponse:
-    """ Manipulators response to a motion query, can result in:
+    """ Manipulators response to a motion query. Fail if::
     -Inverse kinematics fail (point out of reach)
     -Joint value out of range
     -Motor value out of range
+    On success:
+    -
 
     """
     motion_accepted: bool
@@ -77,34 +73,10 @@ class Manipulator:
 
         self.state = ManipulatorState(self.kinematics)
 
-    # TODO: Move to state?
-    def _compute_condition(self, frame: np.ndarray) -> np.ndarray:
-        """
-        @param frame:
-        @return: 6-array of condition [x, y, z, rx, ry, rz]
-        """
-        jacobian_trans = self.state.mcu.jacobian[:3, :3]
-        jacobian_rot = self.state.mcu.jacobian[3:, 3:6]
-        JJT_trans_inv = LA.pinv(jacobian_trans @ jacobian_trans.T)
-        JJT_rot_inv = LA.pinv(jacobian_rot @ jacobian_rot.T)
-        condition_vec = np.zeros(6, dtype=np.float32)
-        cond_x_denom = sqrt(fabs(frame[:, 0].T @ JJT_trans_inv @ frame[:, 0]))
-        cond_y_denom = sqrt(fabs(frame[:, 1].T @ JJT_trans_inv @ frame[:, 1]))
-        cond_z_denom = sqrt(fabs(frame[:, 2].T @ JJT_trans_inv @ frame[:, 2]))
-        cond_rx_denom = sqrt(fabs(frame[:, 0].T @ JJT_rot_inv @ frame[:, 0]))
-        cond_ry_denom = sqrt(fabs(frame[:, 1].T @ JJT_rot_inv @ frame[:, 1]))
-        cond_rz_denom = sqrt(fabs(frame[:, 2].T @ JJT_rot_inv @ frame[:, 2]))
-        eps = 1e-4
-        condition_vec[0] = 1 / cond_x_denom if (cond_x_denom - eps) > 0 else 0
-        condition_vec[1] = 1 / cond_y_denom if (cond_y_denom - eps) > 0 else 0
-        condition_vec[2] = 1 / cond_z_denom if (cond_z_denom - eps) > 0 else 0
-        condition_vec[3] = 1 / cond_rx_denom if (cond_rx_denom - eps) > 0 else 0
-        condition_vec[4] = 1 / cond_ry_denom if (cond_ry_denom - eps) > 0 else 0
-        condition_vec[5] = 1 / cond_rz_denom if (cond_rz_denom - eps) > 0 else 0
-        return condition_vec
+        # TODO: Collision model.
 
     @staticmethod
-    def _move_mot(mot_vec: np.ndarray) -> Optional[np.ndarray]:
+    def _ensure_motor_move(mot_vec: np.ndarray) -> Optional[np.ndarray]:
         """ Execute movement in motor space
         @param mot_vec: 6-vector of absolute motor coordinates in radians.
         @return: Same vector back if accepted, None otherwise
@@ -119,7 +91,7 @@ class Manipulator:
 
         return mot_vec.copy()
 
-    def _move_jnt(self, jnt_vec: np.ndarray) -> np.ndarray | None:
+    def _ensure_joint_move(self, jnt_vec: np.ndarray) -> np.ndarray | None:
         """ Execute movement in joint space.
         @param jnt_vec: 6-vector of absolute joint coordinates in radians.
         @return: 6-vector of absolute motor coordinates if motion accepted, None otherwise
@@ -134,33 +106,49 @@ class Manipulator:
                 return None
 
         # Compute motor coordinates and propagate motion command downwards
-        return self._move_mot(self.kinematics.jnt2mot(jnt_vec_abs))
+        return self._ensure_motor_move(self.kinematics.jnt2mot(jnt_vec_abs))
 
-    # ---------------------------------------------------------------------------------------------
-    # ------------------------------------ Public interface ---------------------------------------
-    # ---------------------------------------------------------------------------------------------
+    # ==================================== Public interface =======================================
 
     def reset(self):
-        self.state.mcu.motor_state = np.zeros(N_REV_JNT)
-        self.state.queued.motor_state = np.zeros(N_REV_JNT)
-        self.state.planner.motor_state = np.zeros(N_REV_JNT)
+        """ Reset internal state """
+        self.state.mcu.motor_state = np.zeros(N_REV_JNT, dtype=np.float64)
+        self.state.queued.motor_state = np.zeros(N_REV_JNT, dtype=np.float64)
+        self.state.planner.motor_state = np.zeros(N_REV_JNT, dtype=np.float64)
 
-    def move_mot(self, mot_vec: np.ndarray, degrees: bool = False) -> np.ndarray | None:
+    def move_motors(self, mcu: Optional[np.ndarray] = None, queued: Optional[np.ndarray] = None, planned: Optional[np.ndarray] = None) -> None:
+        """ Update internal manipulator state with a pre-verified motor vector.
+        :param mcu: Motor vector for mcu state, absolute radians.
+        :param queued: Motor vector for queued state, absolute radians.
+        :param planned: Motor vector for planned state, absolute radians.
+        """
+        if mcu is not None:
+            self.state.mcu.motor_state = mcu
+
+        if queued is not None:
+            self.state.mcu.motor_state = queued
+
+        if planned is not None:
+            self.state.mcu.motor_state = planned
+
+    def request_motor_move(self, mot_vec: np.ndarray, degrees: bool = False) -> Optional[np.ndarray]:
+        """ Request move in motor space. Returns motor vector if move can be executed. """
         mot_pos_absolute = mot_vec.copy()
         if degrees:
             mot_pos_absolute = np.deg2rad(mot_pos_absolute)
-        return self._move_mot(mot_pos_absolute)
+        return self._ensure_motor_move(mot_pos_absolute)
 
-    def move_jnt(self, jnt_vec: np.ndarray, degrees: bool = False) -> np.ndarray | None:
+    def request_joint_move(self, jnt_vec: np.ndarray, degrees: bool = False) -> Optional[np.ndarray]:
+        """ Request move in joint space. Returns motor vector if move can be executed. """
         jnt_pos_absolute = jnt_vec.copy()
         if degrees:
             jnt_pos_absolute = np.deg2rad(jnt_pos_absolute)
-        return self._move_jnt(jnt_pos_absolute)
+        return self._ensure_joint_move(jnt_pos_absolute)
 
-    def move_ops(self, target_pose: Pose) -> Optional[np.ndarray]:
-        """ Motor space interpolated motion to given posture.
-        :param target_pose:
-        :return:
+    def request_cartesian_move(self, target_pose: Pose) -> Optional[np.ndarray]:
+        """ Requests motor space interpolated move to given posture.
+        :param target_pose: Target pose.
+        :return: Motor vector if move can be executed.
         """
         # Move too short
         if self.state.queued.ops_state.is_close(target_pose):
@@ -175,14 +163,14 @@ class Manipulator:
 
         # Propagate motion command forwards
             # Propagate motion command forwards
-        mot_vec = self._move_jnt(jnt_vec)
+        mot_vec = self._ensure_joint_move(jnt_vec)
         if mot_vec is None:
             return None
 
         return mot_vec
 
-    def move_ops_lin(self, target_pose: Pose, speed_linear: float = None, speed_angular: float = None,
-                     segment_length_m: float = 0.001, segment_size_rad: float = 0.0035) -> Tuple[np.ndarray, float] | None:
+    def request_cartesian_linear_move(self, target_pose: Pose, speed_linear: float = None, speed_angular: float = None,
+                                      segment_length_m: float = 0.001, segment_size_rad: float = 0.0035) -> Optional[Tuple[np.ndarray, float]]:
         """ Linear move in operational space  coordinates.
         :param target_pose: Target 6D-Pose in manipulator frame
         :param speed_linear: m/s, linear speed. By default, this is used.
@@ -214,8 +202,7 @@ class Manipulator:
         if speed_angular is not None:
             move_time = max(tool_rotation_dist / speed_angular, move_time)
         if move_time == 0:
-            print("No speed given")
-            return None
+            raise ValueError("Linear movement needs speed specified.")
 
         segment_time = move_time / n_segments  # Seconds
 
@@ -232,7 +219,7 @@ class Manipulator:
             current_jnt_vec = interp_jnt_vec.copy()
 
             # Propagate motion command forwards
-            mot_vec = self._move_jnt(interp_jnt_vec)
+            mot_vec = self._ensure_joint_move(interp_jnt_vec)
             if mot_vec is None:
                 return None
 
@@ -248,10 +235,9 @@ class Manipulator:
         :param speed: Translation speed, meters/second
         :param frame: Frame direction vector is described in. "World", "Base" or "Tool"
         """
-
         # Normalize direction vector
         direction_vec = np.array(direction_vec)
-        unit_vec = direction_vec / LA.norm(direction_vec)
+        unit_vec = direction_vec / np.linalg.norm(direction_vec)
 
         # Convert direction vector relative to World/Base frame. Compute end posture.
         end_pose: Pose = self.state.queued.ops_state
@@ -265,11 +251,7 @@ class Manipulator:
         end_pose.position += distance * unit_vec
 
         # Compute motor vector list for end and intermediate postures
-        start_time = time.perf_counter()
-        ret = self.move_ops_lin(end_pose, speed_linear=speed)
-        end_time = time.perf_counter()
-        print(f"Tralate tool execution time: {end_time-start_time:.6f} seconds")
-        return ret
+        return self.request_cartesian_linear_move(end_pose, speed_linear=speed)
 
     def rotate_tool(self, direction_vec: tuple[int, int, int], angle: float, speed: float, frame: str) -> np.ndarray | None:
         """ Creates a pure rotation around any axis in any frame.
@@ -280,7 +262,7 @@ class Manipulator:
         """
         # Normalize direction vector
         direction_vec = np.array(direction_vec)
-        unit_vec = direction_vec / LA.norm(direction_vec)
+        unit_vec = direction_vec / np.linalg.norm(direction_vec)
 
         # Convert direction vector and angle to a quaternion
         quat_rot = Quaternion.from_axis_angle(tuple(unit_vec), angle)
@@ -295,4 +277,4 @@ class Manipulator:
             raise ValueError("Invalid frame")
 
         # Compute motor vectors for end and intermediate postures
-        return self.move_ops_lin(end_pose, speed_angular=speed)
+        return self.request_cartesian_linear_move(end_pose, speed_angular=speed)

@@ -76,6 +76,10 @@ def MoveCartesianLinear(target: Target, speed: float) -> None:
     lineno = get_caller_line_no()
     get_thread_context().move_cartesian_linear(target=target, speed=speed, lineno=lineno)
 
+def MoveCartesianCircle(target: Target, center: Target, speed: float) -> None:
+    lineno = get_caller_line_no()
+    get_thread_context().move_cartesian_cicle(target, center, speed, lineno=lineno)
+
 def WaitSeconds(seconds: float) -> None:
     pass
 

@@ -98,9 +98,9 @@ class VisionSystem(QObject):
         self.world2camera = Pose(config.WORLD2CAL_BOARD).compose(aruco2camera)
         # self._camera_driver.calibration.extrinsic = self.world2camera
         self._camera_driver.camera.calibration.extrinsic = self.world2camera
-        self.sgn_message.emit(f"Calibration successful.")
-        self.sgn_message.emit(f"Camera position in world frame: {np.round(1000*self.world2camera.position, 1)} millimeters.")
-        self.sgn_message.emit(f"Camera ZYZ-Euler in world frame: {np.round(np.rad2deg(self.world2camera.zyz_euler.array), 1)} degrees.")
+        self.sgn_message.emit(f"Successfully computed camera pose in world frame.\tPosition: "
+                              f"{np.round(1000*self.world2camera.position, 1)} millimeters.\tZYZ-Euler: "
+                              f"{np.round(np.rad2deg(self.world2camera.zyz_euler.array), 1)} degrees.")
 
     def start(self) -> None:
         if self._camera_thread.isRunning():

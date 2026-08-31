@@ -3,8 +3,8 @@
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from application_settings import ApplicationSettings
-from robot_system.gc_serial import GCSerial
-from robot_system.robot_system import RobotSystem
+from robot_manipulator.gc_serial import GCSerial
+from robot_manipulator.robot_system import RobotSystem
 from qt_gui.viewport.scene.scene import SceneGraph
 from vision.vision_system import VisionSystem
 from robot_program.program_manager import ProgramManager

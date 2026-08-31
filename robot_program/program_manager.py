@@ -1,4 +1,4 @@
-from robot_system.robot_system import RobotSystem
+from robot_manipulator.robot_system import RobotSystem
 from robot_program.program_context import *
 from robot_program.program_executor import *
 import robot_program.api as api

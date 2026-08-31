@@ -28,6 +28,10 @@ class ProgramContext:
         self.targets[target.name] = target
         self.root.children.append(MoveCartesianLinearNode(target=target, speed=speed, lineno=lineno))
 
+    def move_cartesian_circle(self, target: Target, center: Target, speed: float, lineno: int) -> None:
+        self.targets[target.name] = target
+        self.root.children.append(MoveCartesianLinearNode(target=target, speed=speed, lineno=lineno))
+
     def wait(self, seconds: float, line_no: int):
         self.root.children.append(WaitSecondsNode(seconds=seconds, line_no=line_no))
 

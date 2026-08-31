@@ -13,17 +13,17 @@ from robot_math.pose import Pose
 import numpy as np
 
 
-@dataclass
 class ManipulatorStateObject:
 
     def __init__(self, kinematics):
 
         self._kinematics = kinematics
 
-        self._motor_state: np.ndarray = np.zeros(6, dtype=np.float64)    # Motor coordinates, radians
-        self._joint_state: np.ndarray = np.zeros(6, dtype=np.float64)    # Joint coordinates, radians
-        self._ops_state: Pose = Pose.identity()                                # 6D operational space posture
-        self._jacobian: np.ndarray = np.zeros(6)
+        self._motor_state: np.ndarray = np.zeros(6, dtype=np.float64)    # Motor coordinates, radians.
+        self._joint_state: np.ndarray = np.zeros(6, dtype=np.float64)    # Joint coordinates, radians.
+        self._ops_state: Pose = Pose.identity()                                # 6D operational space posture.
+        self._jacobian: np.ndarray = np.zeros((6, 6), dtype=np.float64)
+        self._jjt: np.ndarray = np.zeros((6, 6), dtype=np.float64)      # J*J^T Manipulability matrix.
         self._link_poses: List[Pose] = []
         self._spring_poses: List[Pose] = []
         self._counter_weight_pose: Optional[Pose] = None
@@ -89,12 +89,28 @@ class ManipulatorStateObject:
         self._parallel_link_pose = poses["parallel_link_pose"]
         self._ops_state = self._link_poses[-1]
         self._jacobian = self._kinematics.jacobian(jnt_vec)
+        self._jjt_translation = self.jacobian[:3, :3] @ self.jacobian[:3, :3].T
+        self._jjt_rotation = self.jacobian[3:, 3:] @ self.jacobian[3:, 3:].T
 
-        # Singular values and vectors
-        eig_vals_trans, self._sing_vecs_trans = np.linalg.eigh(self._jacobian[:3, :3] @ self._jacobian[:3, :3].T)
-        eig_vals_rot, self._sing_vecs_rot = np.linalg.eigh(self._jacobian[3:, 3:6] @ self._jacobian[3:, 3:6].T)
-        self._sing_vals_translation = np.sqrt(abs(eig_vals_trans))
-        self._sing_vals_rotation = np.sqrt(abs(eig_vals_rot))
+    # TODO: Consider optimizing implementation.
+    def condition(self, frame: np.ndarray) -> np.ndarray:
+        JJT_trans_inv = np.linalg.pinv(self._jjt_translation)
+        JJT_rot_inv = np.linalg.pinv(self._jjt_rotation)
+        condition_vec = np.zeros(6, dtype=np.float32)
+        cond_x_denom = np.sqrt(np.fabs(frame[:, 0].T @ JJT_trans_inv @ frame[:, 0]))
+        cond_y_denom = np.sqrt(np.fabs(frame[:, 1].T @ JJT_trans_inv @ frame[:, 1]))
+        cond_z_denom = np.sqrt(np.fabs(frame[:, 2].T @ JJT_trans_inv @ frame[:, 2]))
+        cond_rx_denom = np.sqrt(np.fabs(frame[:, 0].T @ JJT_rot_inv @ frame[:, 0]))
+        cond_ry_denom = np.sqrt(np.fabs(frame[:, 1].T @ JJT_rot_inv @ frame[:, 1]))
+        cond_rz_denom = np.sqrt(np.fabs(frame[:, 2].T @ JJT_rot_inv @ frame[:, 2]))
+        eps = 1e-4
+        condition_vec[0] = 1 / cond_x_denom if (cond_x_denom - eps) > 0 else 0
+        condition_vec[1] = 1 / cond_y_denom if (cond_y_denom - eps) > 0 else 0
+        condition_vec[2] = 1 / cond_z_denom if (cond_z_denom - eps) > 0 else 0
+        condition_vec[3] = 1 / cond_rx_denom if (cond_rx_denom - eps) > 0 else 0
+        condition_vec[4] = 1 / cond_ry_denom if (cond_ry_denom - eps) > 0 else 0
+        condition_vec[5] = 1 / cond_rz_denom if (cond_rz_denom - eps) > 0 else 0
+        return condition_vec
 
 
 @dataclass

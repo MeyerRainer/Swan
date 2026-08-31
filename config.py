@@ -60,13 +60,6 @@ MOTOR_LIMITS = {
     "M7_MIN": 0,
 }
 
-# MOTOR_LINEAR_LIMITS = {
-#     'ML1_MAX': 300,
-#     'ML1_MIN': 0,
-#     'ML2_MAX': 300,
-#     'ML2_MIN': 0,
-# }
-
 # Joint max speed (deg/min, mm/min)
 MOTOR_MAX_SPEED = {
     "M1": 3000,
@@ -86,14 +79,6 @@ MOTOR_LINEAR_MAX_SPEED = {
 FRAMES = ("World", "Base", "Tool")
 
 # Denavit-Hartenberg parameters
-DH_PARAMS = {
-            'a1': np.float64(0.030),
-            'a2': np.float64(0.160),
-            'a3': np.float64(0.035),
-            'd1': np.float64(0.130),
-            'd4': np.float64(0.195),
-            'd6': np.float64(0.0353)}
-
 DH_TABLE: List[dict] = [
     {'a': np.float64(0.030), 'alpha': np.float64(math.pi/2),    'd': np.float64(0.130), 'nu_offset': np.float64(0.000)},
     {'a': np.float64(0.160), 'alpha': np.float64(0.000),        'd': np.float64(0.000), 'nu_offset': np.float64(math.pi/2)},

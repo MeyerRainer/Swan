@@ -3,16 +3,16 @@
 Author: Rainer Meyer, rot.meyer494@gmail.com
 """
 import config
-from robot_system.manipulator import Manipulator
-from robot_system.linear_axis import LinearAxis
-from robot_system.g_code_writer import GCodeWriter
-from robot_system.system_state import SystemState, ControllerState
+from robot_manipulator.manipulator import Manipulator
+from robot_manipulator.linear_axis import LinearAxis
+from robot_manipulator.gc_writer import GCodeWriter
+from robot_manipulator.system_state import SystemState, ControllerState
 from robot_math.pose import Pose
 from config import *
 from robot_math import utils
 
 import numpy as np
-import numpy.linalg as LA
+import numpy.linalg
 from PyQt6.QtCore import QObject, pyqtSignal
 
 
@@ -127,7 +127,7 @@ class RobotSystem(QObject):
 
         # Normalized direction vector
         delta_mot_vec = sys_mot_vec_target_ctrl_units - sys_mot_vec_queued_ctrl_units
-        delta_mot_vec_norm = LA.norm(delta_mot_vec)
+        delta_mot_vec_norm = np.linalg.norm(delta_mot_vec)
         dir_vec = delta_mot_vec / delta_mot_vec_norm
 
         # Define feedrate
@@ -171,10 +171,10 @@ class RobotSystem(QObject):
         mot_vec_manipulator_rad = jnt_vec[:6]
         mot_vec_linear_axis_m = jnt_vec[6:7]
 
-        mot_vec_man = self._manipulator.move_jnt(mot_vec_manipulator_rad, degrees)
+        mot_vec_man = self._manipulator.request_joint_move(mot_vec_manipulator_rad, degrees)
         if mot_vec_man is None:
             return False
-        mot_vec_lin = self._linear_axis.move_jnt(mot_vec_linear_axis_m)
+        mot_vec_lin = self._linear_axis.request_joint_move(mot_vec_linear_axis_m)
         if mot_vec_lin is None:
             return False
 
@@ -189,7 +189,7 @@ class RobotSystem(QObject):
         :param time_seconds:
         :return:
         """
-        mot_vec = self._manipulator.move_ops(target_pose=target_pose)
+        mot_vec = self._manipulator.request_cartesian_move(target_pose=target_pose)
         if mot_vec is None:
             return False
 
@@ -284,29 +284,25 @@ class RobotSystem(QObject):
         mot_vec = np.array(mot_list)  # Degrees and millimeters
 
         # Update states
-        self._manipulator.state.mcu.motor_state =np.deg2rad(mot_vec[:N_REV_JNT])
-        self._linear_axis.state.mcu.joint_state =0.001 * mot_vec[N_REV_JNT:N_JNT]
+        self._manipulator.move_motors(mcu=np.deg2rad(mot_vec[:N_REV_JNT]))
+        self._linear_axis.move_joints(mcu=0.001 * mot_vec[N_REV_JNT:N_JNT])
 
         tool_wrt_base: Pose = self._manipulator.state.mcu.ops_state
         base_wrt_world = self._linear_axis.state.mcu.pose
         tool_wrt_world = base_wrt_world.compose(tool_wrt_base)
 
-        sing_vals_trans, sing_vecs_trans = self._manipulator.state.mcu.singular_data_translation
-        sing_vals_rot, sing_vecs_rot = self._manipulator.state.mcu.singular_data_rotation
-
         # Condition
-        # TODO: Fix base and world
-        cond_world = self._manipulator._compute_condition(np.eye(3))
-        cond_base = self._manipulator._compute_condition(np.eye(3))
-        cond_tool = self._manipulator._compute_condition(tool_wrt_base.rot_mat)
+        cond_world = self._manipulator.state.mcu.condition(np.eye(3))
+        cond_base = self._manipulator.state.mcu.condition(np.eye(3))
+        cond_tool = self._manipulator.state.mcu.condition(tool_wrt_base.rot_mat)
 
         jnt_vec_deg = np.zeros(8)
         jnt_vec_deg[:6] = np.rad2deg(self._manipulator.state.mcu.joint_state)
         jnt_vec_deg[6:7] = 1000 * self._linear_axis.state.mcu.joint_state
 
-        # delta_t = 0.1
+        # TODO: Clean this mess.
         alpha = 0.95
-        delta_x = LA.norm(tool_wrt_base.position - self.previous_pose.position)
+        delta_x = np.linalg.norm(tool_wrt_base.position - self.previous_pose.position)
         speed_linear: float = alpha * utils.m_s2mm_min(delta_x / delta_t) + (1 - alpha) * self.speed_linear_prev
         speed_angular: float = alpha * utils.rad_sec2deg_min(abs(tool_wrt_base.quaternion.angle(self.previous_pose.quaternion)) / delta_t) + (1 - alpha) * self.speed_angular_prev
         self.speed_linear_prev, self.speed_angular_prev = speed_linear, speed_angular
@@ -325,10 +321,6 @@ class RobotSystem(QObject):
             'condition_world': cond_world,
             'condition_base': cond_base,
             'condition_tool': cond_tool,
-            'sing_vals_trans': sing_vals_trans,
-            'sing_vecs_trans': sing_vecs_trans,
-            'sing_vals_rot': sing_vals_rot,
-            'sing_vecs_rot': sing_vecs_rot,
             'speed_linear': speed_linear,
             'speed_angular': speed_angular,
         }
