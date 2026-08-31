@@ -73,6 +73,9 @@ class VisionSystem(QObject):
         self.world2camera: Optional[Pose] = None
         self.CAMERA_CALIBRATION_PATH: str = "camera_calibration"
 
+    def __del__(self):
+        self.stop()
+
     def camera_calibration_intrinsic(self):
         self._camera_calibrated_intrinsic = self._camera_driver.camera.calibrate(n_corners=(9, 6), image_path=self.CAMERA_CALIBRATION_PATH)
 
@@ -96,7 +99,6 @@ class VisionSystem(QObject):
 
         # Camera with respect to world pose.
         self.world2camera = Pose(config.WORLD2CAL_BOARD).compose(aruco2camera)
-        # self._camera_driver.calibration.extrinsic = self.world2camera
         self._camera_driver.camera.calibration.extrinsic = self.world2camera
         self.sgn_message.emit(f"Successfully computed camera pose in world frame.\tPosition: "
                               f"{np.round(1000*self.world2camera.position, 1)} millimeters.\tZYZ-Euler: "
@@ -119,6 +121,9 @@ class VisionSystem(QObject):
         # Stop the camera worker.
         self._camera_driver.stop()
         if self._camera_thread.isRunning():
+            # if hasattr(self, '_camera_driver'):
+            #     print(f"Has")
+            #     self._camera_driver.deleteLater()
             self._camera_thread.quit()
             self._camera_thread.wait()
         # Wait for vision processing to finish.

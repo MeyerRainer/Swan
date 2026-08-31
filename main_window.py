@@ -29,11 +29,15 @@ class MainWindow(QMainWindow):
 
         # Toolbar
         self.toolbar = MainToolbar()
+        self.toolbar.setObjectName("Toolbar")
 
         # Docks
         self.terminal_dock = TerminalDock()
+        self.terminal_dock.setObjectName("TerminalDock")
         self.left_dock = LeftDock()
+        self.left_dock.setObjectName("LeftDock")
         self.right_dock = RightDock()
+        self.right_dock.setObjectName("RightDock")
 
         # Widgets
         self.control_panel = ControlWidget()

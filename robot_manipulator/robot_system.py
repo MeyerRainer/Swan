@@ -162,16 +162,16 @@ class RobotSystem(QObject):
 
         return True
 
-    def move_jnt(self, jnt_vec: np.ndarray, time: float | None = None, speed: float | None = None, degrees: bool = False) -> bool:
+    def move_jnt(self, jnt_vec: np.ndarray, time: float | None = None, speed: float | None = None) -> bool:
         """ Move 8-joint
-        @:param jnt_vec: 8-vector, radians and meters
-        @:param time: Motion time in seconds
-        @:param speed: Motion speed in rad/s
+        :param jnt_vec: 8-vector, radians and meters
+        :param time: Motion time in seconds
+        :param speed: Motion speed in rad/s
         """
         mot_vec_manipulator_rad = jnt_vec[:6]
         mot_vec_linear_axis_m = jnt_vec[6:7]
 
-        mot_vec_man = self._manipulator.request_joint_move(mot_vec_manipulator_rad, degrees)
+        mot_vec_man = self._manipulator.request_joint_move(mot_vec_manipulator_rad)
         if mot_vec_man is None:
             return False
         mot_vec_lin = self._linear_axis.request_joint_move(mot_vec_linear_axis_m)

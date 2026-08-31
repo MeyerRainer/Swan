@@ -20,7 +20,7 @@ class ApplicationContext:
         self.serial = GCSerial()
         self.robot_sys = RobotSystem()
         self.vision_sys = VisionSystem()
-        self.scene = SceneGraph(robot_sys=self.robot_sys, root=None, dir_path="scene/")
+        self.scene = SceneGraph(root=None, dir_path="scene/")
         self.planner = TrajectoryPlanner()
         self.program_manager = ProgramManager(planner=self.planner)
         # self.scene.print_tree()
@@ -44,6 +44,6 @@ class ApplicationContext:
 
     def update_status(self, status, m_pos, delta_t) -> dict:
         status_dict: dict = self.robot_sys.update_status(status, m_pos, delta_t)
-        self.scene.update_robot_sys()
+        self.scene.update_robot_sys(self.robot_sys)
 
         return status_dict

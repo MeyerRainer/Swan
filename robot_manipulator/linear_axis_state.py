@@ -36,7 +36,7 @@ class LinearAxisStateObject:
     #     return self._position.copy()
     @property
     def pose(self) -> Pose:
-        return self._pose
+        return self._pose.copy()
 
     @joint_state.setter
     def joint_state(self, jnt_vec: np.ndarray):

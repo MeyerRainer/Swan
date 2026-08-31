@@ -144,7 +144,7 @@ class ApplicationController(QObject):
         jnt_vec = np.array([j1, j2, j3, j4, j5, j6, j7, j8])
         speed = utils.deg_min2rad_sec(self.main_window.control_panel.speed_joint.value())
 
-        self.app_context.robot_sys.request_joint_move(jnt_vec, time=None, speed=speed)
+        self.app_context.robot_sys.move_jnt(jnt_vec, time=None, speed=speed)
 
     def translate_robot_sys(self, direction: Tuple[int, int, int]):
         distance: float = self.main_window.control_panel.increment_linear.value() / 1000       # m
