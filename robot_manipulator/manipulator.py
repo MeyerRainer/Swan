@@ -2,7 +2,6 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
-from dataclasses import dataclass
 from robot_math.quaternion import Quaternion
 from robot_manipulator.manipulator_state import ManipulatorState
 from robot_manipulator.kinematics.anthropomorphic_spherical_wrist import *

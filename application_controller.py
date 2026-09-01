@@ -26,7 +26,7 @@ class ApplicationController(QObject):
     def connect_signals(self):
 
         # =========================================== Viewport ===========================================
-        self.main_window.view_scene.gizmo_controller.sgn_mouse_move.connect(self.app_context.robot_sys.plan7d)
+        self.main_window.view_scene.gizmo_controller.sgn_mouse_move.connect(self.app_context.robot_sys.plan_8d)
 
         # =========================================== Toolbar ============================================
         # GUI -> Context
@@ -148,7 +148,7 @@ class ApplicationController(QObject):
         jnt_vec = np.array([j1, j2, j3, j4, j5, j6, j7, j8])
         speed = utils.deg_min2rad_sec(self.main_window.control_panel.speed_joint.value())
 
-        self.app_context.robot_sys.move_jnt(jnt_vec, time=None, speed=speed)
+        self.app_context.robot_sys.sys_joint_move_8d(jnt_vec, time=None, speed=speed)
 
     def translate_robot_sys(self, direction: Tuple[int, int, int]):
         distance: float = self.main_window.control_panel.increment_linear.value() / 1000       # m
@@ -163,7 +163,7 @@ class ApplicationController(QObject):
         self.app_context.robot_sys.rotate_tool(direction_vec=direction, angle=angle_increment, speed=speed, frame=frame)
 
     def home(self):
-        self.app_context.robot_sys.move_jnt(np.zeros(8), time=None, speed=utils.deg_min2rad_sec(self.main_window.control_panel.speed_joint.value()))
+        self.app_context.robot_sys.sys_joint_move_8d(np.zeros(8), time=None, speed=utils.deg_min2rad_sec(self.main_window.control_panel.speed_joint.value()))
 
 
     def on_status_update(self, grbl_status_str):

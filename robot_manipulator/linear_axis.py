@@ -11,10 +11,10 @@ import config
 
 class LinearAxis:
 
-    def __init__(self, base_offset: np.ndarray):
+    def __init__(self):
 
         # World to base offset at zero joints.
-        self.base_offset = base_offset
+        self.base_offset = config.BASE_OFFSET
 
         # Linear axis kinematics.
         self.kinematics = TrivKins1D(self.base_offset, config.LINEAR_AXIS)

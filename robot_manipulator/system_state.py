@@ -6,16 +6,15 @@ planned: State based on trajectory planners.
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
-
+from enum import Enum, auto
+import numpy as np
 from robot_manipulator.manipulator_state import ManipulatorState, ManipulatorStateObject
 from robot_manipulator.linear_axis_state import LinearAxisState, LinearAxisStateObject
-from config import N_REV_JNT, N_LIN_JNT, N_JNT
-
-import numpy as np
-from enum import Enum, auto
+from robot_math.pose import Pose
+from config import N_REV_JNT, N_JNT
 
 
-# GRBL state
+# MCU State (GRBL)
 class ControllerState(Enum):
     IDLE = auto()
     ALARM = auto()
@@ -35,6 +34,7 @@ class SystemStateObject:
         self.manipulator: ManipulatorStateObject = manipulator_state_object
         self.linear_axis: LinearAxisStateObject = linear_axis_state_object
 
+    # ========================================== Getters ==========================================
     @property
     def motor_state_ctrl_units(self) -> np.ndarray:
         mot_vec = np.zeros(8, dtype=np.float64)
@@ -49,6 +49,26 @@ class SystemStateObject:
         mot_vec[N_REV_JNT:N_JNT] = self.linear_axis.joint_state
         return mot_vec
 
+    @property
+    def joint_state_ctrl_units(self) -> np.ndarray:
+        jnt_vec = np.zeros(8, dtype=np.float64)
+        jnt_vec[:N_REV_JNT] = np.rad2deg(self.manipulator.joint_state)
+        jnt_vec[N_REV_JNT:N_JNT] = 1000 * self.linear_axis.joint_state  # =motor_state
+        return jnt_vec
+
+    @property
+    def pose_base_wrt_world(self) -> Pose:
+        return self.linear_axis.pose
+
+    @property
+    def pose_tool_wrt_base(self) -> Pose:
+        return self.manipulator.ops_state
+
+    @property
+    def pose_tool_wrt_world(self) -> Pose:
+        return self.pose_base_wrt_world.compose(self.pose_tool_wrt_base)
+
+    # ========================================== Setters ==========================================
     @motor_state_ctrl_units.setter
     def motor_state_ctrl_units(self, mot_vec_ctrl_units):
         """ Sets manipulator and linear axis state

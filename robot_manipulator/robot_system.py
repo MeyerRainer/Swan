@@ -26,17 +26,14 @@ class RobotSystem(QObject):
         super().__init__()
 
         self._manipulator = Manipulator()
-        self._linear_axis = LinearAxis(base_offset=config.BASE_OFFSET)
+        self._linear_axis = LinearAxis()
+        self._gc_writer = GCodeWriter()
+        self.state: SystemState = SystemState(self._manipulator.state, self._linear_axis.state)
 
-        self.gc_writer = GCodeWriter()
-
+        # TODO: Delete.
         self.previous_pose: Pose = Pose.identity()
         self.speed_linear_prev = 0.
         self.speed_angular_prev = 0.
-
-        # self.executor = MotionExecutor()
-
-        self.state: SystemState = SystemState(self._manipulator.state, self._linear_axis.state)
 
     # def move_lin_7d(self, end_pose: Pose, stepping_rate: float = 1e-4) -> bool:
     #     """ Numerical inverse kinematics to solve 7 joints for given pose and an additional criteria
@@ -104,16 +101,16 @@ class RobotSystem(QObject):
         self._manipulator.state.planner.motor_state = mot_vec
         self._linear_axis.state.planned.joint_state = np.array([0.])
 
-    def plan7d(self) -> None:
+    def plan_8d(self) -> None:
         pose_world: Pose = self._manipulator.state.planner.link_nodes["ToolFrame"].pose  # World frame
 
-        mot_vec: np.ndarray = self.move_cartesian_7d(pose_world)
+        mot_vec: np.ndarray = self.move_cartesian_8d(pose_world)
         if mot_vec is None:
             return
 
         self.state.planned.motor_state = mot_vec
 
-    def sys_motor_move(self, mot_vec_manipulator: Optional[np.ndarray] = None,
+    def sys_queue_move(self, mot_vec_manipulator: Optional[np.ndarray] = None,
                        mot_vec_linear_axis: Optional[np.ndarray] = None,
                        time: Optional[float] = None,
                        speed: Optional[float] = None,
@@ -168,11 +165,11 @@ class RobotSystem(QObject):
         self.sgn_speed_throttled.emit(feedrate_throttle_factor)
 
         # Write G-code for motor motion and send to serial queue.
-        g_code = self.gc_writer.move(x=float(sys_mot_vec_target_ctrl_units[0]), y=float(sys_mot_vec_target_ctrl_units[1]),
-                                            z=float(sys_mot_vec_target_ctrl_units[2]), a=float(sys_mot_vec_target_ctrl_units[3]),
-                                            b=float(sys_mot_vec_target_ctrl_units[4]), c=float(sys_mot_vec_target_ctrl_units[5]),
-                                            u=float(sys_mot_vec_target_ctrl_units[6]), v=float(sys_mot_vec_target_ctrl_units[7]),
-                                            feedrate=feedrate, rapid=False)
+        g_code = self._gc_writer.move(x=float(sys_mot_vec_target_ctrl_units[0]), y=float(sys_mot_vec_target_ctrl_units[1]),
+                                      z=float(sys_mot_vec_target_ctrl_units[2]), a=float(sys_mot_vec_target_ctrl_units[3]),
+                                      b=float(sys_mot_vec_target_ctrl_units[4]), c=float(sys_mot_vec_target_ctrl_units[5]),
+                                      u=float(sys_mot_vec_target_ctrl_units[6]), v=float(sys_mot_vec_target_ctrl_units[7]),
+                                      feedrate=feedrate, rapid=False)
 
         self.state.queued.motor_state_ctrl_units = sys_mot_vec_target_ctrl_units
         self.g_code_generated.emit(g_code)
@@ -180,7 +177,7 @@ class RobotSystem(QObject):
 
         return True
 
-    def move_mot(self, mot_vec: np.ndarray, time: float | None = None, speed: float | None = None) -> bool:
+    def sys_motor_move_8d(self, mot_vec: np.ndarray, time: float | None = None, speed: float | None = None) -> bool:
         """ Move 8-joint
         :param mot_vec: 8-vector, radians and meters
         :param time: Motion time in seconds
@@ -197,11 +194,11 @@ class RobotSystem(QObject):
             return False
 
         # Send to serial
-        self.sys_motor_move(mot_vec_manipulator=mot_vec_man, mot_vec_linear_axis=mot_vec_lin, time=time, speed=speed)
+        self.sys_queue_move(mot_vec_manipulator=mot_vec_man, mot_vec_linear_axis=mot_vec_lin, time=time, speed=speed)
 
         return True
 
-    def move_jnt(self, jnt_vec: np.ndarray, time: float | None = None, speed: float | None = None) -> bool:
+    def sys_joint_move_8d(self, jnt_vec: np.ndarray, time: float | None = None, speed: float | None = None) -> bool:
         """ Move 8-joint
         :param jnt_vec: 8-vector, radians and meters
         :param time: Motion time in seconds
@@ -218,7 +215,7 @@ class RobotSystem(QObject):
             return False
 
         # Send to serial
-        self.sys_motor_move(mot_vec_manipulator=mot_vec_man, mot_vec_linear_axis=mot_vec_lin, time=time, speed=speed)
+        self.sys_queue_move(mot_vec_manipulator=mot_vec_man, mot_vec_linear_axis=mot_vec_lin, time=time, speed=speed)
 
         return True
 
@@ -232,10 +229,10 @@ class RobotSystem(QObject):
         if mot_vec is None:
             return False
 
-        self.sys_motor_move(mot_vec_manipulator=mot_vec, time=time_seconds)
+        self.sys_queue_move(mot_vec_manipulator=mot_vec, time=time_seconds)
         return True
 
-    def move_cartesian_7d(self, target_pose: Pose, time_seconds: Optional[float] = None) -> Optional[np.ndarray]:
+    def move_cartesian_8d(self, target_pose: Pose, time_seconds: Optional[float] = None) -> Optional[np.ndarray]:
         """ Moves to cartesian space using 7 axis.
         :param target_pose: Target pose in world frame.
         :param time_seconds: Motion time in seconds.
@@ -296,14 +293,11 @@ class RobotSystem(QObject):
         if ret is None:
             self.send_terminal.emit("Translation failed.")
             return False
-
         # Unpack motor values and segment time.
         mot_vecs, segment_time = ret
-
         # Send G-code to serial
         for vec in mot_vecs:
-            # self.write_g_code(vec, mot_vec_prev, segment_time)
-            self.sys_motor_move(mot_vec_manipulator=vec, time=segment_time)
+            self.sys_queue_move(mot_vec_manipulator=vec, time=segment_time)
 
         return True
 
@@ -319,13 +313,11 @@ class RobotSystem(QObject):
         if ret is None:
             self.send_terminal.emit("Rotation failed.")
             return False
-
         # Unpack motor values and segment time.
         mot_vecs, segment_time = ret
-
         # Send G-code to serial
         for vec in mot_vecs:
-            self.sys_motor_move(mot_vec_manipulator=vec, time=segment_time)
+            self.sys_queue_move(mot_vec_manipulator=vec, time=segment_time)
 
         return True
 
@@ -333,18 +325,18 @@ class RobotSystem(QObject):
         """ Execute state found in planned state.
         """
         mot_vec: np.ndarray = self.state.planned.motor_state
-        self.move_mot(mot_vec, time=10)
+        self.sys_motor_move_8d(mot_vec, time=10)
 
     def reset(self):
         self._manipulator.reset()
 
     def toggle_feed_hold(self):
         if self.state.controller == ControllerState.HOLD:
-            self.g_code_generated.emit(self.gc_writer.cycle_start())
+            self.g_code_generated.emit(self._gc_writer.cycle_start())
         elif self.state.controller == ControllerState.IDLE:
-            self.g_code_generated.emit(self.gc_writer.cycle_start())
+            self.g_code_generated.emit(self._gc_writer.cycle_start())
         elif self.state.controller == ControllerState.CYCLE:
-            self.g_code_generated.emit(self.gc_writer.feed_hold())
+            self.g_code_generated.emit(self._gc_writer.feed_hold())
 
     def update_status(self, status: str, mot_list: list, delta_t: float):
         """ Update system status and return by dictionary.
@@ -368,26 +360,20 @@ class RobotSystem(QObject):
             case "Door":
                 self.state.controller = ControllerState.SAFETY_DOOR
 
-        # Real motor values reported by controller
-        mot_vec = np.array(mot_list)  # Degrees and millimeters
+        # Update MCU states with real motor values reported by controller.
+        mot_vec_ctrl_units = np.array(mot_list)  # Degrees and millimeters
+        self.state.mcu.motor_state_ctrl_units = mot_vec_ctrl_units
+        jnt_vec_ctrl_units = self.state.mcu.joint_state_ctrl_units
 
-        # Update states
-        # self._manipulator.move_motors(mcu=np.deg2rad(mot_vec[:config.N_REV_JNT]))
-        # self._linear_axis.move_joints(mcu=0.001 * mot_vec[config.N_REV_JNT:config.N_JNT])
-        self.state.mcu.motor_state_ctrl_units = mot_vec
-
-        tool_wrt_base: Pose = self._manipulator.state.mcu.ops_state
-        base_wrt_world = self._linear_axis.state.mcu.pose
-        tool_wrt_world = base_wrt_world.compose(tool_wrt_base)
+        # Tool pose.
+        tool_wrt_base: Pose = self.state.mcu.pose_tool_wrt_base
+        tool_wrt_world: Pose = self.state.mcu.pose_tool_wrt_world
 
         # Condition
+        # TODO: Call system state instead.
         cond_world = self._manipulator.state.mcu.condition(np.eye(3))
         cond_base = self._manipulator.state.mcu.condition(np.eye(3))
         cond_tool = self._manipulator.state.mcu.condition(tool_wrt_base.rot_mat)
-
-        jnt_vec_deg = np.zeros(8)
-        jnt_vec_deg[:6] = np.rad2deg(self._manipulator.state.mcu.joint_state)
-        jnt_vec_deg[6:7] = 1000 * self._linear_axis.state.mcu.joint_state
 
         # TODO: Clean this mess.
         alpha = 0.95
@@ -401,7 +387,7 @@ class RobotSystem(QObject):
         state = {
             'status': status,
             'mot_coords_deg': np.array(mot_list),
-            'jnt_coords_deg': jnt_vec_deg,
+            'jnt_coords_deg': jnt_vec_ctrl_units,
             'ops_coords_base': tool_wrt_base,
             'ops_coords_world': tool_wrt_world,
             'link_poses': self._manipulator.state.mcu.link_poses,
