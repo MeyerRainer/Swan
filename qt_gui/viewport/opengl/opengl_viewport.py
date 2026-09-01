@@ -44,7 +44,6 @@ class OpenGLViewport(QOpenGLWidget):
         # Orbit
         else:
             self.camera_controller.handle_mouse_move(event)
-        self.sgn_mouse_move.emit()
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         self.camera_controller.handle_mouse_release(event)

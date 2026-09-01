@@ -12,6 +12,6 @@
 #
 #     def update_state(self, pose: Pose):
 #         jnt
-#         self.robot_sys.sys_state.planned
+#         self.robot_sys.state.planned
 #
 #

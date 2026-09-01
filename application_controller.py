@@ -26,7 +26,7 @@ class ApplicationController(QObject):
     def connect_signals(self):
 
         # =========================================== Viewport ===========================================
-        self.main_window.view_scene.sgn_mouse_move.connect(self.app_context.robot_sys.plan)
+        self.main_window.view_scene.gizmo_controller.sgn_mouse_move.connect(self.app_context.robot_sys.plan7d)
 
         # =========================================== Toolbar ============================================
         # GUI -> Context

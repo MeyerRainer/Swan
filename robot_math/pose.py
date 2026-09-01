@@ -10,6 +10,7 @@ from robot_math.quaternion import Quaternion
 from robot_math.zyz_euler import ZYZEuler
 import numpy as np
 
+np.set_printoptions(suppress=True)
 
 class Pose:
 
@@ -20,7 +21,7 @@ class Pose:
             self.pose = SE3.copy()
 
     def __repr__(self) -> str:
-        return f"Pose:\n{self.pose}"
+        return f"Position: {self.position}\tZYZ Euler: {np.rad2deg(self.zyz_euler.array)}"
 
     def __copy__(self):
         return Pose(self.pose)

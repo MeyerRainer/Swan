@@ -2,6 +2,7 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
+from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QVector3D, QQuaternion
 from dataclasses import dataclass
 from typing import Optional
@@ -31,9 +32,13 @@ class DragContext:
     rotation_center: QVector3D | None = None
 
 
-class GizmoController:
+class GizmoController(QObject):
+
+    sgn_mouse_move = pyqtSignal()
 
     def __init__(self):
+
+        super().__init__()
 
         self.active_gizmo: Optional[Gizmo] = None
         self.DC = DragContext()
@@ -57,6 +62,7 @@ class GizmoController:
     def handle_mouse_move(self, ray_origin: QVector3D, ray_dir: QVector3D):
         if self.active_gizmo is not None:
             self.update_drag(ray_origin, ray_dir)
+            self.sgn_mouse_move.emit()
 
     def handle_mouse_release(self) -> bool:
         if self.active_gizmo is not None:

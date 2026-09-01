@@ -195,6 +195,11 @@ class ASWKinematics:
         wrist_pose[:3, 3] -= d6 * tool_flange_pose[:3, 2]
         wx, wy, wz = wrist_pose[0, 3], wrist_pose[1, 3], wrist_pose[2, 3]
 
+        if np.isnan(wx) or np.isnan(wy) or np.isnan(wz):
+            # print(f"WX: {wx:.6f}\tWY: {wy:.6f}\tWZ: {wz:.6f}")
+            print(f"IK: Target pose: {target_pose})")
+
+
         # Solve Joint 1 and check limit.
         # TODO: wy = wx = 0 leads to shoulder singularity! Then we must define J1 based on additional information!
 

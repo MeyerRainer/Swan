@@ -22,14 +22,17 @@ class LinearAxis:
         # Linear axis internal state.
         self.state = LinearAxisState(self.kinematics)
 
-
     # ================================= Public =================================
 
     @staticmethod
     def request_joint_move(jnt_vec: np.ndarray) -> Optional[np.ndarray]:
-
+        """ Request joint motion.
+        :param jnt_vec: Absolute joint values in meters.
+        :return: Joint vector if accepted.
+        """
         for idx in range(config.N_LIN_JNT):
-            if not config.JOINT_LINEAR_LIMITS[f"JL{idx + 1}_MIN"] <= jnt_vec[idx] <= config.JOINT_LINEAR_LIMITS[f"JL{idx + 1}_MAX"]:
+            jnt_value_mm = 1000 * jnt_vec[idx]
+            if not config.JOINT_LINEAR_LIMITS[f"JL{idx + 1}_MIN"] < jnt_value_mm < config.JOINT_LINEAR_LIMITS[f"JL{idx + 1}_MAX"]:
                 print(f"Linear motor value out of range")
                 return None
 

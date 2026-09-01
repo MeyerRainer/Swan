@@ -20,7 +20,7 @@ class ManipulatorStateObject:
     def __init__(self, kinematics):
 
         self._kinematics = kinematics
-        self._world_pose: Pose = Pose.identity()
+        self._base_pose: Pose = Pose.from_position(config.BASE_OFFSET)  # Base w.r.t. world.
         self._motor_state: np.ndarray = np.zeros(6, dtype=np.float64)    # Motor coordinates, radians.
         self._joint_state: np.ndarray = np.zeros(6, dtype=np.float64)    # Joint coordinates, radians.
         self._ops_state: Pose = Pose.identity()                                # 6D operational space posture.
@@ -41,8 +41,8 @@ class ManipulatorStateObject:
         self.motor_state = self._motor_state
 
     @property
-    def world_pose(self) -> Pose:
-        return self._world_pose.copy()
+    def base_pose(self) -> Pose:
+        return self._base_pose.copy()
 
     @property
     def motor_state(self) -> np.ndarray:
@@ -84,9 +84,9 @@ class ManipulatorStateObject:
     def singular_data_rotation(self):
         return self._sing_vals_rotation, self._sing_vecs_rotation
 
-    @world_pose.setter
-    def world_pose(self, pose: Pose) -> None:
-        self._world_pose = pose.copy()
+    @base_pose.setter
+    def base_pose(self, pose: Pose) -> None:
+        self._base_pose = pose.copy()
 
     @motor_state.setter
     def motor_state(self, mot_vec: np.ndarray):
@@ -127,8 +127,8 @@ class ManipulatorStateObject:
         return condition_vec
 
     def update_link_visuals(self):
-        base_pose = Pose.from_position(config.BASE_OFFSET)
-        # base_pose = self._world_pose
+        # base_pose = Pose.from_position(config.BASE_OFFSET)
+        base_pose = self._base_pose
         if "L2" in self.link_nodes:
             self.link_nodes["L2"].pose = base_pose.compose(self.link_poses[0])
         if "L3" in self.link_nodes:

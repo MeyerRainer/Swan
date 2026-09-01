@@ -39,7 +39,7 @@ class SceneGraph(QAbstractItemModel):
         # self.add_node(parent_idx=QModelIndex(), node=ellipsoid_node)
 
         # Attach gizmo.
-        tool_node = self._robot_sys.sys_state.planned.manipulator.link_nodes["ToolFrame"]
+        tool_node = self._robot_sys.state.planned.manipulator.link_nodes["ToolFrame"]
         tool_node.gizmo = Gizmo(tool_node)
 
     def size(self):
@@ -253,17 +253,18 @@ class SceneGraph(QAbstractItemModel):
                     mesh_params = MeshSpecs(file_path=entry)
                     mcu_node.visual = MeshObject(mesh_params)
                     planned_node.visual = MeshObject(mesh_params)
-                    self._robot_sys.sys_state.mcu.manipulator.link_nodes[link_name] = mcu_node
-                    self._robot_sys.sys_state.planned.manipulator.link_nodes[link_name] = planned_node
-                if entry.parent.name == "linear_axis":
+                    self._robot_sys.state.mcu.manipulator.link_nodes[link_name] = mcu_node
+                    self._robot_sys.state.planned.manipulator.link_nodes[link_name] = planned_node
+                # Linear axis nodes.
+                elif entry.parent.name == "linear_axis":
                     mcu_node: SceneNode = SceneNode(name=entry.name, parent=parent_node)
                     planned_node: SceneNode = SceneNode(name=entry.name, parent=parent_node)
                     mesh_params = MeshSpecs(file_path=entry)
                     mcu_node.visual = MeshObject(mesh_params)
                     planned_node.visual = MeshObject(mesh_params)
                     link_name: str = entry.name.split(".")[0]
-                    self._robot_sys.sys_state.mcu.linear_axis.link_nodes[link_name] = mcu_node
-                    self._robot_sys.sys_state.planned.linear_axis.link_nodes[link_name] = planned_node
+                    self._robot_sys.state.mcu.linear_axis.link_nodes[link_name] = mcu_node
+                    self._robot_sys.state.planned.linear_axis.link_nodes[link_name] = planned_node
                 else:
                     new_node: SceneNode = SceneNode(name=entry.name, parent=parent_node)
                     mesh_params = MeshSpecs(file_path=entry)

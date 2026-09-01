@@ -100,7 +100,8 @@ CHAR_LEN = np.float64(0.2)  # Characteristic length, m
 
 # Sled total length (X-axis): 150mm
 # Sled rail center-to-center width (Y-axis): 118mm
-BASE_OFFSET = np.array([0.225, 0.380, 0.0], dtype=np.float64)  # Offset from world origin to base at zero linear joints.
+# BASE_OFFSET = np.array([0.225, 0.380, 0.0], dtype=np.float64)  # Offset from world origin to base at zero linear joints.
+BASE_OFFSET = np.array([0.440, 0.380, 0.0], dtype=np.float64)  # Offset from world origin to base at zero linear joints. (Mid-rail)
 
 # Tool frame respect to J6 frame
 TOOL_OFS = np.array([
