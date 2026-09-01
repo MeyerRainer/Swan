@@ -36,10 +36,17 @@ class SystemStateObject:
         self.linear_axis: LinearAxisStateObject = linear_axis_state_object
 
     @property
-    def motor_state_ctrl_units(self):
-        mot_vec = np.zeros(8)
+    def motor_state_ctrl_units(self) -> np.ndarray:
+        mot_vec = np.zeros(8, dtype=np.float64)
         mot_vec[:N_REV_JNT] = np.rad2deg(self.manipulator.motor_state)
         mot_vec[N_REV_JNT:N_JNT] = 1000 * self.linear_axis.joint_state  # =motor_state
+        return mot_vec
+
+    @property
+    def motor_state(self) -> np.ndarray:
+        mot_vec = np.zeros(8, dtype=np.float64)
+        mot_vec[:N_REV_JNT] = self.manipulator.motor_state
+        mot_vec[N_REV_JNT:N_JNT] = self.linear_axis.joint_state
         return mot_vec
 
     @motor_state_ctrl_units.setter
@@ -48,9 +55,15 @@ class SystemStateObject:
         :param mot_vec_ctrl_units: 8-vector of motor coordinates in degrees and millimeters.
         :return: None
         """
-        self.manipulator.motor_state = np.deg2rad(mot_vec_ctrl_units[:N_REV_JNT])
         self.linear_axis.joint_state = 0.001 * mot_vec_ctrl_units[N_REV_JNT:N_JNT]  # =motor state
-        self.manipulator.world_pose = self.linear_axis.pose
+        self.manipulator.base_pose = self.linear_axis.pose
+        self.manipulator.motor_state = np.deg2rad(mot_vec_ctrl_units[:N_REV_JNT])
+
+    @motor_state.setter
+    def motor_state(self, mot_vec: np.ndarray) -> None:
+        self.linear_axis.joint_state = mot_vec[N_REV_JNT:N_JNT]
+        self.manipulator.base_pose = self.linear_axis.pose
+        self.manipulator.motor_state = mot_vec[:N_REV_JNT]
 
     @property
     def base_jacobian(self) -> np.ndarray:

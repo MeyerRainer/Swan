@@ -3,6 +3,7 @@ Class for control panel widget.
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
+from PyQt6.QtCore import pyqtSignal
 
 import config
 from qt_gui.docks.panels.custom_slider import CustomSlider
@@ -41,10 +42,12 @@ class ControlWidget(QWidget):
 
         super().__init__()
 
-        self.setMinimumWidth(360)
+        self.setMinimumWidth(320)
 
         self.home_button = QPushButton("Home")
         self.enable_button = QPushButton("Enable")
+        self.execute_button = QPushButton("Execute Planned")
+        self.free_button = QPushButton("")
 
         self.radio_button_jnt = QRadioButton("Joint")
         self.radio_button_ops = QRadioButton("Cartesian")
@@ -124,11 +127,13 @@ class ControlWidget(QWidget):
         motion_group = QGroupBox("Motion")
         v_motion_layout = QVBoxLayout()
 
-        h_option_layout = QHBoxLayout()
-        h_option_layout.addWidget(self.home_button)
-        h_option_layout.addWidget(self.enable_button)
+        g_option_layout = QGridLayout()
+        g_option_layout.addWidget(self.home_button, 0, 0)
+        g_option_layout.addWidget(self.enable_button, 0, 1)
+        g_option_layout.addWidget(self.execute_button, 1, 0)
+        g_option_layout.addWidget(self.free_button, 1, 1)
 
-        v_motion_layout.addLayout(h_option_layout)
+        v_motion_layout.addLayout(g_option_layout)
 
         self.radio_button_jnt.toggled.connect(self.switch_joint_mode)
         self.radio_button_ops.toggled.connect(self.switch_ops_mode)

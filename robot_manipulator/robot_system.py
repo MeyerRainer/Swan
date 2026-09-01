@@ -109,13 +109,9 @@ class RobotSystem(QObject):
 
         mot_vec: np.ndarray = self.move_cartesian_7d(pose_world)
         if mot_vec is None:
-            print(f"IK Fail")
             return
 
-        self._linear_axis.state.planned.joint_state = mot_vec[config.N_REV_JNT:config.N_JNT]
-        base_pose = self._linear_axis.state.planned.pose
-        self._manipulator.state.planner.motor_state = mot_vec[:config.N_REV_JNT]
-        self._manipulator.state.planner.base_pose = base_pose
+        self.state.planned.motor_state = mot_vec
 
     def sys_motor_move(self, mot_vec_manipulator: Optional[np.ndarray] = None,
                        mot_vec_linear_axis: Optional[np.ndarray] = None,
@@ -184,6 +180,27 @@ class RobotSystem(QObject):
 
         return True
 
+    def move_mot(self, mot_vec: np.ndarray, time: float | None = None, speed: float | None = None) -> bool:
+        """ Move 8-joint
+        :param mot_vec: 8-vector, radians and meters
+        :param time: Motion time in seconds
+        :param speed: Motion speed in rad/s
+        """
+        mot_vec_manipulator_rad = mot_vec[:config.N_REV_JNT]
+        mot_vec_linear_axis_m = mot_vec[config.N_REV_JNT:config.N_JNT]
+
+        mot_vec_man = self._manipulator.request_motor_move(mot_vec_manipulator_rad)
+        if mot_vec_man is None:
+            return False
+        mot_vec_lin = self._linear_axis.request_joint_move(mot_vec_linear_axis_m)
+        if mot_vec_lin is None:
+            return False
+
+        # Send to serial
+        self.sys_motor_move(mot_vec_manipulator=mot_vec_man, mot_vec_linear_axis=mot_vec_lin, time=time, speed=speed)
+
+        return True
+
     def move_jnt(self, jnt_vec: np.ndarray, time: float | None = None, speed: float | None = None) -> bool:
         """ Move 8-joint
         :param jnt_vec: 8-vector, radians and meters
@@ -242,7 +259,6 @@ class RobotSystem(QObject):
             x = x_solutions[0]
 
         else:  # One solution
-            print(f"Sucks")
             x = target_pose.position[0]
             x = np.clip(x, 0.001*config.JOINT_LINEAR_LIMITS["JL1_MIN"], 0.001*config.JOINT_LINEAR_LIMITS["JL1_MAX"])
 
@@ -259,7 +275,6 @@ class RobotSystem(QObject):
 
         # Ensure motion is executable.
         mot_vec_manipulator: np.ndarray = self._manipulator.request_cartesian_move(manipulator_target)
-        print(f"7d: {manipulator_target}")
         mot_vec_linear_axis: np.ndarray = self._linear_axis.request_joint_move(linear_axis_target)
         if mot_vec_manipulator is None or mot_vec_linear_axis is None:
             return None
@@ -314,6 +329,12 @@ class RobotSystem(QObject):
 
         return True
 
+    def execute_planned(self):
+        """ Execute state found in planned state.
+        """
+        mot_vec: np.ndarray = self.state.planned.motor_state
+        self.move_mot(mot_vec, time=10)
+
     def reset(self):
         self._manipulator.reset()
 
@@ -351,8 +372,9 @@ class RobotSystem(QObject):
         mot_vec = np.array(mot_list)  # Degrees and millimeters
 
         # Update states
-        self._manipulator.move_motors(mcu=np.deg2rad(mot_vec[:config.N_REV_JNT]))
-        self._linear_axis.move_joints(mcu=0.001 * mot_vec[config.N_REV_JNT:config.N_JNT])
+        # self._manipulator.move_motors(mcu=np.deg2rad(mot_vec[:config.N_REV_JNT]))
+        # self._linear_axis.move_joints(mcu=0.001 * mot_vec[config.N_REV_JNT:config.N_JNT])
+        self.state.mcu.motor_state_ctrl_units = mot_vec
 
         tool_wrt_base: Pose = self._manipulator.state.mcu.ops_state
         base_wrt_world = self._linear_axis.state.mcu.pose

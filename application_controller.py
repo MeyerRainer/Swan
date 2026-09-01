@@ -39,6 +39,7 @@ class ApplicationController(QObject):
 
         # ======================================== Control panel =========================================
         self.main_window.control_panel.home_button.clicked.connect(self.home)
+        self.main_window.control_panel.execute_button.clicked.connect(self.app_context.robot_sys.execute_planned)
         # Translation
         self.main_window.control_panel.x_plus.clicked.connect(lambda: self.translate_robot_sys(direction=(1, 0, 0)))
         self.main_window.control_panel.x_minus.clicked.connect(lambda: self.translate_robot_sys(direction=(-1, 0, 0)))
@@ -162,7 +163,7 @@ class ApplicationController(QObject):
         self.app_context.robot_sys.rotate_tool(direction_vec=direction, angle=angle_increment, speed=speed, frame=frame)
 
     def home(self):
-        self.app_context.robot_sys.request_joint_move(np.zeros(8), time=None, speed=utils.deg_min2rad_sec(self.main_window.control_panel.speed_joint.value()))
+        self.app_context.robot_sys.move_jnt(np.zeros(8), time=None, speed=utils.deg_min2rad_sec(self.main_window.control_panel.speed_joint.value()))
 
 
     def on_status_update(self, grbl_status_str):
