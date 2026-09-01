@@ -3,7 +3,7 @@
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from typing import override
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, pyqtSignal
 from PyQt6.QtGui import QMouseEvent, QWheelEvent
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 
@@ -15,6 +15,8 @@ from qt_gui.viewport import cg_math
 
 
 class OpenGLViewport(QOpenGLWidget):
+
+    sgn_mouse_move = pyqtSignal()
 
     def __init__(self, parent=None):
 
@@ -42,6 +44,7 @@ class OpenGLViewport(QOpenGLWidget):
         # Orbit
         else:
             self.camera_controller.handle_mouse_move(event)
+        self.sgn_mouse_move.emit()
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         self.camera_controller.handle_mouse_release(event)

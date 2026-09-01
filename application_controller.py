@@ -25,6 +25,9 @@ class ApplicationController(QObject):
 
     def connect_signals(self):
 
+        # =========================================== Viewport ===========================================
+        self.main_window.view_scene.sgn_mouse_move.connect(self.app_context.robot_sys.plan)
+
         # =========================================== Toolbar ============================================
         # GUI -> Context
         self.main_window.toolbar.refresh_button.clicked.connect(self.app_context.serial.refresh_ports)

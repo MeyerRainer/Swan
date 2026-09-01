@@ -4,38 +4,30 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from PyQt6.QtCore import Qt, QModelIndex, QAbstractItemModel, QIODevice, QDataStream, QMimeData, QByteArray
 from typing_extensions import override
-from typing import Optional, Any, Dict
+from typing import Optional, Any
 from pathlib import Path
-
-import config
-from robot_manipulator.robot_system import RobotSystem
 from qt_gui.viewport.scene.visuals.mesh import MeshObject, MeshSpecs
 from qt_gui.viewport.scene.visuals.ellipsoid import EllipsoidSpecs, Ellipsoid
 from qt_gui.viewport.gizmo.gizmo import Gizmo
 from qt_gui.viewport.scene.visuals.grid import Grid, GridSpecs
 from qt_gui.viewport.scene.scene_node import SceneNode
-from robot_math.pose import Pose
+from robot_manipulator.robot_system import RobotSystem
 
 
 class SceneGraph(QAbstractItemModel):
 
     MIME_TYPE = "application/x-scenenode-pointer"
 
-    def __init__(self, root: Optional[SceneNode] = None, parent=None, dir_path: str = ""):
+    def __init__(self, robot_sys = None, root: Optional[SceneNode] = None, parent=None, dir_path: str = ""):
 
         super().__init__(parent)
 
         self.root_node = root or SceneNode("Root")
 
-        self._robot_link_nodes: Optional[Dict[str, SceneNode]] = {}  # SceneNodes for robot links
-        self._robot_spring_nodes: Optional[Dict[str, SceneNode]] = {}
-        self._robot_counter_weight_node: Optional[SceneNode] = None
+        self._robot_sys: RobotSystem = robot_sys
 
         if dir_path:
             self.build_from_directory(dir_path)
-
-        self.L0 = SceneNode(name="L0", parent=self.root_node)
-        self.L0.visual = MeshObject(MeshSpecs(file_path=Path("scene/robot/L0.obj")))
 
         grid_node = SceneNode(name="Grid", parent=self.root_node)
         grid_node.visual = Grid(name="Grid", params=GridSpecs())
@@ -43,42 +35,12 @@ class SceneGraph(QAbstractItemModel):
 
         ellipsoid_node = SceneNode(name="Ellipsoid", parent=self.root_node)
         ellipsoid_node.visual = Ellipsoid(EllipsoidSpecs(radii=(0.05, 0.02, 0.01)))
-        ellipsoid_node.gizmo = Gizmo(ellipsoid_node)
+        # ellipsoid_node.gizmo = Gizmo(ellipsoid_node)
         # self.add_node(parent_idx=QModelIndex(), node=ellipsoid_node)
 
-    def update_robot_sys(self, robot_sys: RobotSystem):
-        link_poses = robot_sys.sys_state.mcu.manipulator.link_poses
-        spring_poses = robot_sys.sys_state.mcu.manipulator.spring_poses
-        cw_pose = robot_sys.sys_state.mcu.manipulator.counter_weight_pose
-        pl_pose = robot_sys.sys_state.mcu.manipulator.parallel_link_pose
-        base_pose: Pose = robot_sys.sys_state.mcu.linear_axis.pose
-        if "L1" in self._robot_link_nodes:
-            self._robot_link_nodes["L1"].pose = base_pose
-        if "L2" in self._robot_link_nodes:
-            self._robot_link_nodes["L2"].pose = base_pose.compose(link_poses[0])
-        if "L3" in self._robot_link_nodes:
-            self._robot_link_nodes["L3"].pose = base_pose.compose(link_poses[1])
-        if "L4" in self._robot_link_nodes:
-            self._robot_link_nodes["L4"].pose = base_pose.compose(link_poses[2])
-        if "L5" in self._robot_link_nodes:
-            self._robot_link_nodes["L5"].pose = base_pose.compose(link_poses[3])
-        if "L6" in self._robot_link_nodes:
-            self._robot_link_nodes["L6"].pose = base_pose.compose(link_poses[4])
-        if "ToolFrame" in self._robot_link_nodes:
-            self._robot_link_nodes["ToolFrame"].pose = base_pose.compose(link_poses[5].compose(Pose(config.TOOL_OFS)))
-        if "LCW" in self._robot_link_nodes:
-            self._robot_link_nodes["LCW"].pose = base_pose.compose(cw_pose)
-        if "LPL" in self._robot_link_nodes:
-            self._robot_link_nodes["LPL"].pose = base_pose.compose(pl_pose)
-        if "SpringDown" in self._robot_link_nodes:
-            self._robot_link_nodes["SpringDown"].pose = base_pose.compose(spring_poses[0])
-
-        # self._robot_spring_nodes["left_down"].pose = sprint_poses[0]
-        # self._robot_spring_nodes["right_down"].pose = sprint_poses[1]
-        # self._robot_spring_nodes["left_up"].pose = sprint_poses[2]
-        # self._robot_spring_nodes["right_up"].pose = sprint_poses[3]
-        #
-        # self._robot_counter_weight_node.pose = cw_pose
+        # Attach gizmo.
+        tool_node = self._robot_sys.sys_state.planned.manipulator.link_nodes["ToolFrame"]
+        tool_node.gizmo = Gizmo(tool_node)
 
     def size(self):
         return self.root_node.num_nodes()
@@ -282,40 +244,30 @@ class SceneGraph(QAbstractItemModel):
                 # else:
                 self._populate_directory_tree(entry, dir_node)
             elif entry.suffix.lower() == ".obj":
-                new_node: SceneNode = SceneNode(name=entry.name, parent=parent_node)
-                mesh_params = MeshSpecs(file_path=entry)
-                new_node.visual = MeshObject(mesh_params)
+
                 # If new node is a robot link, take a reference to it.
                 if entry.parent.name == "robot":
                     link_name: str = entry.name.split(".")[0]
-                    self._robot_link_nodes[link_name] = new_node
-
-
-
-    # def _set_robot_visuals(self, current_path: Path) -> None:
-    #     """ Build robot using links in the "robot" folder and DH-table in config.
-    #     """
-    #     # Set meshes for links
-    #     for entry in sorted(current_path.iterdir()):
-    #         if entry.is_dir():
-    #             print(entry)
-    #             raise ValueError("Robot directory should only contain .obj files.")
-    #         if entry.name == "L0.obj":
-    #             self._robot_link_nodes['L0'].visual = MeshObject(MeshSpecs(file_path=entry))
-    #             # print(f"Scene: L0 visual set with file_path: {entry}")
-    #         if entry.name == "L1.obj":
-    #             self._robot_link_nodes['L1'].visual = MeshObject(MeshSpecs(file_path=entry))
-    #         if entry.name == "L2.obj":
-    #             self._robot_link_nodes['L2'].visual = MeshObject(MeshSpecs(file_path=entry))
-    #         if entry.name == "L3.obj":
-    #             self._robot_link_nodes['L3'].visual = MeshObject(MeshSpecs(file_path=entry))
-    #         if entry.name == "L4.obj":
-    #             self._robot_link_nodes['L4'].visual = MeshObject(MeshSpecs(file_path=entry))
-    #         if entry.name == "L5.obj":
-    #             self._robot_link_nodes['L5'].visual = MeshObject(MeshSpecs(file_path=entry))
-    #         if entry.name == "L6.obj":
-    #             self._robot_link_nodes['L6'].visual = MeshObject(MeshSpecs(file_path=entry))
-    #     return
+                    mcu_node: SceneNode = SceneNode(name=entry.name, parent=parent_node)
+                    planned_node: SceneNode = SceneNode(name=entry.name, parent=parent_node)
+                    mesh_params = MeshSpecs(file_path=entry)
+                    mcu_node.visual = MeshObject(mesh_params)
+                    planned_node.visual = MeshObject(mesh_params)
+                    self._robot_sys.sys_state.mcu.manipulator.link_nodes[link_name] = mcu_node
+                    self._robot_sys.sys_state.planned.manipulator.link_nodes[link_name] = planned_node
+                if entry.parent.name == "linear_axis":
+                    mcu_node: SceneNode = SceneNode(name=entry.name, parent=parent_node)
+                    planned_node: SceneNode = SceneNode(name=entry.name, parent=parent_node)
+                    mesh_params = MeshSpecs(file_path=entry)
+                    mcu_node.visual = MeshObject(mesh_params)
+                    planned_node.visual = MeshObject(mesh_params)
+                    link_name: str = entry.name.split(".")[0]
+                    self._robot_sys.sys_state.mcu.linear_axis.link_nodes[link_name] = mcu_node
+                    self._robot_sys.sys_state.planned.linear_axis.link_nodes[link_name] = planned_node
+                else:
+                    new_node: SceneNode = SceneNode(name=entry.name, parent=parent_node)
+                    mesh_params = MeshSpecs(file_path=entry)
+                    new_node.visual = MeshObject(mesh_params)
 
     # --- Drag & Drop MIME Handlers ---
 

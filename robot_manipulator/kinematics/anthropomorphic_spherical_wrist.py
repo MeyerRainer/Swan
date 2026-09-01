@@ -33,7 +33,7 @@ class JointLimit(Enum):
 class IkSolution:
     singularity: Singularity = Singularity.NO_SINGULARITY
     joint_limits: JointLimit = JointLimit.CLEAR
-    joint_solution: np.ndarray = field(default_factory=np.zeros(6, dtype=np.float64))
+    joint_solution: np.ndarray = field(default_factory=lambda: np.zeros(6, dtype=np.float64))
     success: bool = False
 
 
@@ -216,7 +216,7 @@ class ASWKinematics:
         cos_theta3 = (base2wrist_sqr - a2 * a2 - elbow2wrist * elbow2wrist) / (2.0 * a2 * elbow2wrist)
         # Point out of reach. No solution.
         if cos_theta3 < -1 or cos_theta3 > 1:
-            return IkSolution(singularity=Singularity.ELBOW_SINGULARITY)
+            return IkSolution(singularity = Singularity.ELBOW_SINGULARITY)
 
         if elbow_down:
             sin_theta3 = np.sqrt(1 - cos_theta3 * cos_theta3)

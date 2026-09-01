@@ -50,6 +50,7 @@ class SystemStateObject:
         """
         self.manipulator.motor_state = np.deg2rad(mot_vec_ctrl_units[:N_REV_JNT])
         self.linear_axis.joint_state = 0.001 * mot_vec_ctrl_units[N_REV_JNT:N_JNT]  # =motor state
+        self.manipulator.world_pose = self.linear_axis.pose
 
     @property
     def base_jacobian(self) -> np.ndarray:

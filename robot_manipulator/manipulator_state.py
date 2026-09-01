@@ -5,9 +5,11 @@ planned: State based on trajectory planners.
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
-
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Dict
+
+import config
+from qt_gui.viewport.scene.scene_node import SceneNode
 
 from robot_math.pose import Pose
 import numpy as np
@@ -18,7 +20,7 @@ class ManipulatorStateObject:
     def __init__(self, kinematics):
 
         self._kinematics = kinematics
-
+        self._world_pose: Pose = Pose.identity()
         self._motor_state: np.ndarray = np.zeros(6, dtype=np.float64)    # Motor coordinates, radians.
         self._joint_state: np.ndarray = np.zeros(6, dtype=np.float64)    # Joint coordinates, radians.
         self._ops_state: Pose = Pose.identity()                                # 6D operational space posture.
@@ -33,8 +35,14 @@ class ManipulatorStateObject:
         self._sing_vals_rotation: np.ndarray = np.zeros(3, dtype=np.float64)
         self._sing_vecs_rotation: np.ndarray = np.zeros((3, 3), dtype=np.float64)
 
+        self.link_nodes: Optional[Dict[str, SceneNode]] = {}  # SceneNodes for robot links
+
         # Initialize state
         self.motor_state = self._motor_state
+
+    @property
+    def world_pose(self) -> Pose:
+        return self._world_pose.copy()
 
     @property
     def motor_state(self) -> np.ndarray:
@@ -76,6 +84,10 @@ class ManipulatorStateObject:
     def singular_data_rotation(self):
         return self._sing_vals_rotation, self._sing_vecs_rotation
 
+    @world_pose.setter
+    def world_pose(self, pose: Pose) -> None:
+        self._world_pose = pose.copy()
+
     @motor_state.setter
     def motor_state(self, mot_vec: np.ndarray):
         # Motor state is source of truth. Everything else derived from it.
@@ -91,6 +103,8 @@ class ManipulatorStateObject:
         self._jacobian = self._kinematics.jacobian(jnt_vec)
         self._jjt_translation = self.jacobian[:3, :3] @ self.jacobian[:3, :3].T
         self._jjt_rotation = self.jacobian[3:, 3:] @ self.jacobian[3:, 3:].T
+
+        self.update_link_visuals()
 
     # TODO: Consider optimizing implementation.
     def condition(self, frame: np.ndarray) -> np.ndarray:
@@ -111,6 +125,28 @@ class ManipulatorStateObject:
         condition_vec[4] = 1 / cond_ry_denom if (cond_ry_denom - eps) > 0 else 0
         condition_vec[5] = 1 / cond_rz_denom if (cond_rz_denom - eps) > 0 else 0
         return condition_vec
+
+    def update_link_visuals(self):
+        base_pose = Pose.from_position(config.BASE_OFFSET)
+        # base_pose = self._world_pose
+        if "L2" in self.link_nodes:
+            self.link_nodes["L2"].pose = base_pose.compose(self.link_poses[0])
+        if "L3" in self.link_nodes:
+            self.link_nodes["L3"].pose = base_pose.compose(self.link_poses[1])
+        if "L4" in self.link_nodes:
+            self.link_nodes["L4"].pose = base_pose.compose(self.link_poses[2])
+        if "L5" in self.link_nodes:
+            self.link_nodes["L5"].pose = base_pose.compose(self.link_poses[3])
+        if "L6" in self.link_nodes:
+            self.link_nodes["L6"].pose = base_pose.compose(self.link_poses[4])
+        if "ToolFrame" in self.link_nodes:
+            self.link_nodes["ToolFrame"].pose = base_pose.compose(self.link_poses[5].compose(Pose(config.TOOL_OFS)))
+        if "LCW" in self.link_nodes:
+            self.link_nodes["LCW"].pose = base_pose.compose(self._counter_weight_pose)
+        if "LPL" in self.link_nodes:
+            self.link_nodes["LPL"].pose = base_pose.compose(self._parallel_link_pose)
+        if "SpringDown" in self.link_nodes:
+            self.link_nodes["SpringDown"].pose = base_pose.compose(self.spring_poses[0])
 
 
 @dataclass

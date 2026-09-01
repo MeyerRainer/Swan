@@ -48,12 +48,12 @@ class Gizmo(Renderable):
 
         # TODO: Add priority.
         if trans_axis_handle != HandleType.NONE:
-            return trans_axis_handle
+            return trans_axis_handle, self
         if rot_plane_handle != HandleType.NONE:
-            return rot_plane_handle
+            return rot_plane_handle, self
         if trans_plane_handle != HandleType.NONE:
-            return trans_plane_handle
-        return HandleType.NONE
+            return trans_plane_handle, self
+        return HandleType.NONE, self
 
     def hit_translation_axis(self, ray_origin: QVector3D, ray_dir: QVector3D) -> HandleType:
         """ Checks if translation arrow has been hit. If so, which one.

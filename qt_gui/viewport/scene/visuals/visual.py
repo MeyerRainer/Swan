@@ -2,7 +2,7 @@
 
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
-from typing import Protocol, Any
+from typing import Protocol, Any, Optional
 import numpy as np
 
 from qt_gui.viewport.opengl.render.renderer import RenderContext
@@ -40,9 +40,9 @@ class Visual:
         self.material: Material | None = None
 
         # GPU Buffer Handles (Populated later inside your QOpenGLWidget)
-        self.vao_id: int | None = None
-        self.vbo_id: int | None = None
-        self.ebo_id: int | None = None
+        self.vao_id: Optional[int] = None
+        self.vbo_id: Optional[int] = None
+        self.ebo_id: Optional[int] = None
 
         self.line_render: bool = False  # Triangle or line rendering.
 

@@ -2,18 +2,17 @@
 
 Author: Rainer Meyer, rot.meyer494@gmail.com
 """
-import config
+from PyQt6.QtCore import QObject, pyqtSignal
+import numpy as np
+from typing import Optional
+
+from robot_manipulator.system_state import SystemState, ControllerState
 from robot_manipulator.manipulator import Manipulator
 from robot_manipulator.linear_axis import LinearAxis
 from robot_manipulator.gc_writer import GCodeWriter
-from robot_manipulator.system_state import SystemState, ControllerState
 from robot_math.pose import Pose
-from config import *
 from robot_math import utils
-
-import numpy as np
-import numpy.linalg
-from PyQt6.QtCore import QObject, pyqtSignal
+import config
 
 
 class RobotSystem(QObject):
@@ -97,9 +96,21 @@ class RobotSystem(QObject):
         #     iters += 1
         #
         # return True
+    def plan(self) -> None:
+        pose_world: Pose = self._manipulator.state.planner.link_nodes["ToolFrame"].pose  # World frame
+        pose_base: Pose = pose_world.relative_to(self.sys_state.mcu.linear_axis.pose)
 
-    def sys_motor_move(self, mot_vec_manipulator: np.ndarray | None = None, mot_vec_linear_axis: np.ndarray | None = None,
-                       time: float | None = None, speed: float | None = None, incremental=False) -> bool:
+        mot_vec = self._manipulator.request_cartesian_move(pose_base)
+        if mot_vec is None:
+            print(f"IK Fail")
+            return
+        self._manipulator.state.planner.motor_state = mot_vec
+
+    def sys_motor_move(self, mot_vec_manipulator: Optional[np.ndarray] = None,
+                       mot_vec_linear_axis: Optional[np.ndarray] = None,
+                       time: Optional[float] = None,
+                       speed: Optional[float] = None,
+                       incremental=False) -> bool:
         """ Constructs an 8-vector of absolute motor coordinates to move to and a unit vector pointing
         towards the motion direction in motor space.
         @:param mot_vec_manipulator: Desired absolute coordinates for manipulator in radians
@@ -115,15 +126,15 @@ class RobotSystem(QObject):
         sys_mot_vec_target_ctrl_units = sys_mot_vec_queued_ctrl_units.copy()
         if incremental:  # Add
             if mot_vec_manipulator is not None:
-                sys_mot_vec_target_ctrl_units[:6] += np.rad2deg(mot_vec_manipulator[:6].copy())
+                sys_mot_vec_target_ctrl_units[:config.N_REV_JNT] += np.rad2deg(mot_vec_manipulator[:config.N_REV_JNT].copy())
             if mot_vec_linear_axis is not None:
-                sys_mot_vec_target_ctrl_units[6:7] += 1000 * mot_vec_linear_axis.copy()
+                sys_mot_vec_target_ctrl_units[config.N_REV_JNT:config.N_JNT] += 1000 * mot_vec_linear_axis.copy()
 
         else:  # Override
             if mot_vec_manipulator is not None:
-                sys_mot_vec_target_ctrl_units[:6] = np.rad2deg(mot_vec_manipulator.copy())  # Target position in degrees
+                sys_mot_vec_target_ctrl_units[:config.N_REV_JNT] = np.rad2deg(mot_vec_manipulator.copy())  # Target position in degrees
             if mot_vec_linear_axis is not None:
-                sys_mot_vec_target_ctrl_units[6:7] = 1000 * mot_vec_linear_axis.copy()  # Target position in millimeters
+                sys_mot_vec_target_ctrl_units[config.N_REV_JNT:config.N_JNT] = 1000 * mot_vec_linear_axis.copy()  # Target position in millimeters
 
         # Normalized direction vector
         delta_mot_vec = sys_mot_vec_target_ctrl_units - sys_mot_vec_queued_ctrl_units
@@ -168,8 +179,8 @@ class RobotSystem(QObject):
         :param time: Motion time in seconds
         :param speed: Motion speed in rad/s
         """
-        mot_vec_manipulator_rad = jnt_vec[:6]
-        mot_vec_linear_axis_m = jnt_vec[6:7]
+        mot_vec_manipulator_rad = jnt_vec[:config.N_REV_JNT]
+        mot_vec_linear_axis_m = jnt_vec[config.N_REV_JNT:config.N_JNT]
 
         mot_vec_man = self._manipulator.request_joint_move(mot_vec_manipulator_rad)
         if mot_vec_man is None:
@@ -284,8 +295,8 @@ class RobotSystem(QObject):
         mot_vec = np.array(mot_list)  # Degrees and millimeters
 
         # Update states
-        self._manipulator.move_motors(mcu=np.deg2rad(mot_vec[:N_REV_JNT]))
-        self._linear_axis.move_joints(mcu=0.001 * mot_vec[N_REV_JNT:N_JNT])
+        self._manipulator.move_motors(mcu=np.deg2rad(mot_vec[:config.N_REV_JNT]))
+        self._linear_axis.move_joints(mcu=0.001 * mot_vec[config.N_REV_JNT:config.N_JNT])
 
         tool_wrt_base: Pose = self._manipulator.state.mcu.ops_state
         base_wrt_world = self._linear_axis.state.mcu.pose

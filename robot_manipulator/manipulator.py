@@ -42,8 +42,8 @@ class MotorSolution(Enum):
     M6_POSITIVE_LIMIT = auto()
 
 
-class IkSolution(Enum):
-    OK = auto()
+# class IkSolution(Enum):
+#     OK = auto()
 
 
 @dataclass
@@ -157,7 +157,7 @@ class Manipulator:
         current_jnt_vec: np.ndarray = self.state.queued.joint_state
         ik_sol: IkSolution = self.kinematics.inverse(target_pose, prev_jnt_vec=current_jnt_vec)
         if not ik_sol.success:
-            print(f"move_ops_lin: IK fail.")
+            print(f"move_ops_lin: IK fail. Joints={ik_sol.joint_limits}, Singularity={ik_sol.singularity}")
             return None
         jnt_vec: np.ndarray = ik_sol.joint_solution
 

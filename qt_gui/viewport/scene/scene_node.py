@@ -3,10 +3,10 @@
 Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from PyQt6.QtGui import QVector3D, QQuaternion, QVector4D
-from typing import Optional, Any
+from typing import Optional, Any, Tuple
 import numpy as np
 
-from qt_gui.viewport.gizmo.gizmo import Gizmo
+from qt_gui.viewport.gizmo.gizmo import Gizmo, HandleType
 from qt_gui.viewport.scene.visuals.visual import Renderable
 from robot_math.pose import Pose
 from robot_math.quaternion import Quaternion
@@ -97,12 +97,12 @@ class SceneNode:
         for child in self.children:
             child.render(context)
 
-    def ray_hit(self, ray_origin, ray_dir) -> Optional[Any]:
+    def ray_hit(self, ray_origin, ray_dir) -> Optional[Tuple[HandleType, Gizmo]]:
         # Return first ray intersection found in children or self
         for child in self.children:
             hit = child.ray_hit(ray_origin, ray_dir)
             if hit is not None:
-                return hit, child.gizmo
+                return hit
         if self.gizmo is not None:
             return self.gizmo.ray_hit(ray_origin, ray_dir)
         return None

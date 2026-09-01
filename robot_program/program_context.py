@@ -1,11 +1,9 @@
-from robot_program.node import *
-from robot_program.instructions.instruction import *
+""" Internal data structure of a robot program.
 
-import sys
-import traceback
-from dataclasses import dataclass, field
-from typing import List, Optional, Any, Dict
-from abc import ABC, abstractmethod
+Author: Rainer Meyer, r.meyer494@gmail.com
+"""
+from typing import Dict
+from robot_program.instructions.instruction import *
 
 
 class ProgramContext:
