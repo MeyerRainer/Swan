@@ -39,7 +39,8 @@ class ApplicationController(QObject):
 
         # ======================================== Control panel =========================================
         self.main_window.control_panel.home_button.clicked.connect(self.home)
-        self.main_window.control_panel.execute_button.clicked.connect(self.app_context.robot_sys.execute_planned)
+        self.main_window.gizmo_panel.execute_planned_button.clicked.connect(self.app_context.robot_sys.execute_planned)
+        self.main_window.gizmo_panel.revert_planned_button.clicked.connect(self.app_context.robot_sys.revert_planned)
         # Translation
         self.main_window.control_panel.x_plus.clicked.connect(lambda: self.translate_robot_sys(direction=(1, 0, 0)))
         self.main_window.control_panel.x_minus.clicked.connect(lambda: self.translate_robot_sys(direction=(-1, 0, 0)))

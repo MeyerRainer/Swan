@@ -139,14 +139,20 @@ class ManipulatorStateObject:
             self.link_nodes["L5"].pose = base_pose.compose(self.link_poses[3])
         if "L6" in self.link_nodes:
             self.link_nodes["L6"].pose = base_pose.compose(self.link_poses[4])
-        if "ToolFrame" in self.link_nodes:
-            self.link_nodes["ToolFrame"].pose = base_pose.compose(self.link_poses[5].compose(Pose(config.TOOL_OFS)))
+        # if "ToolFrame" in self.link_nodes:
+        #     self.link_nodes["ToolFrame"].pose = base_pose.compose(self.link_poses[5].compose(Pose(config.TOOL_OFS)))
+        if "PenHolder" in self.link_nodes:
+            self.link_nodes["PenHolder"].pose = base_pose.compose(self.link_poses[5].compose(Pose(config.TOOL_OFS)))
         if "LCW" in self.link_nodes:
             self.link_nodes["LCW"].pose = base_pose.compose(self._counter_weight_pose)
         if "LPL" in self.link_nodes:
             self.link_nodes["LPL"].pose = base_pose.compose(self._parallel_link_pose)
         if "SpringDown" in self.link_nodes:
             self.link_nodes["SpringDown"].pose = base_pose.compose(self.spring_poses[0])
+
+    def render_link_visuals(self, visible: bool):
+        for link in self.link_nodes.items():
+            link.visible = visible
 
 
 @dataclass

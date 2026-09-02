@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Callable
 import cv2
 import numpy as np
 
@@ -73,7 +73,7 @@ class GameBoard:
 
 class TTTBoard(GameBoard):
 
-    def __init__(self):
+    def __init__(self, msg_callback: Callable[[str], None]):
 
         super().__init__()
 
@@ -82,10 +82,13 @@ class TTTBoard(GameBoard):
         self.players_turn: bool = True  # Player begins.
         self.MARKS = ["O", "Board", "X"]
 
+        # Messages
+        self.msg_callback: Callable[[str], None] = msg_callback
+
     def reset(self):
         self.board: List[List[str]] = [[" " for _ in range(3)] for _ in range(3)]
         self.players_turn = True
-        print(f"TTT Board reset.")
+        self.msg_callback("Game reset.")
 
     def board2grid(self, x: float, y: float) -> Optional[Tuple[int, int]]:
         """ Takes 2D coordinates in board frame and outputs the grid location.
@@ -146,17 +149,17 @@ class TTTBoard(GameBoard):
 
             point_board_frame: np.ndarray = self.image2board(cx, cy, cam_cal=camera_calibration, board_pose=board_pose_estimation)
             if point_board_frame is None:
-                print(f"Could not compute board frame coordinates.")
+                self.msg_callback(f"Could not compute board frame coordinates.")
                 continue
 
             grid_coords = self.board2grid(x=point_board_frame[0], y=point_board_frame[1])
             if grid_coords is None:
-                print(f"TTT: Invalid board coords: X: {point_board_frame[0]:.3f}\tY: {point_board_frame[1]:.3f} for mark {mark}")
+                self.msg_callback(f"Invalid board coords: X:{point_board_frame[0]:.3f} Y:{point_board_frame[1]:.3f} for mark {mark}")
                 continue
 
             i, j = grid_coords[0], grid_coords[1]
             if not (0 <= i <= 2 and 0 <= j <= 2):
-                print(f"TTT: Grid out of board. (i={i}, j={j})")
+                self.msg_callback(f"Grid out of board. (i={i}, j={j})")
                 continue
 
             if self.board[i][j] != ' ':
@@ -166,32 +169,33 @@ class TTTBoard(GameBoard):
 
     def _add_mark(self, i: int, j: int, mark: str) -> bool:
         # New mark. Add to board.
-        print(f"TTT Update: Add {mark} at X:{i}\tY:{j}")
+        self.msg_callback(f"Board updated. Mark {mark} added at X:{i} Y:{j}.")
         self.board[i][j] = mark
 
         if self._is_game_over():
             score: int = self._evaluate()
             draw: bool = True if score == 0 else False
             if draw:
-                print(f"Game over. Draw.")
+                self.msg_callback(f"Game over. Draw.")
                 return False
             winner = "machine" if score == -10 else "player"
-            print(f"Game over. {winner} wins.")
+            self.msg_callback(f"Game over. {winner} wins.")
             return False
 
         if mark == "O":  # Set by machine.
             self.players_turn = True
-            print(f"Players turn.")
+            self.msg_callback(f"Players turn.")
         if mark == "X":  # Set by player.
             self.players_turn = False
             machine_move = self.make_machine_move()
             if machine_move:
                 board_coords: np.ndarray = self.grid2board(machine_move[0], machine_move[1])
                 world_coords: np.ndarray = self.board2world(board_coords)
-                print(f"Board coords: {board_coords}")
-                print(f"Machine move: X:{machine_move[0]}\tY:{machine_move[1]}. World coordinates: X:{world_coords[0]}\tY:{world_coords[1]}\tZ:{world_coords[2]}.")
+                # self.msg_callback(f"Board coords: {board_coords}")
+                self.msg_callback(f"Machine move to grid X:{machine_move[0]:.3f}Y:{machine_move[1]:.3f}.")
+                self.msg_callback(f"World coordinates: X:{world_coords[0]:.3f}Y:{world_coords[1]:.3f}Z:{world_coords[2]:.3f}.")
             else:
-                print(f"Machine move solver failed.")
+                self.msg_callback(f"Machine move solver failed.")
 
         return True
 

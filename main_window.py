@@ -6,6 +6,7 @@ from qt_gui.docks.panels.toolbar import MainToolbar
 from qt_gui.docks.dock import *
 from qt_gui.viewport.opengl.opengl_viewport import OpenGLViewport
 from qt_gui.docks.panels.control_widget import ControlWidget
+from qt_gui.docks.panels.gizmo_widget import GizmoWidget
 from qt_gui.docks.panels.scene_widget import SceneWidget
 from qt_gui.docks.panels.dro_widget import DROWidget
 from qt_gui.docks.panels.program_widget import ProgramWidget
@@ -39,24 +40,28 @@ class MainWindow(QMainWindow):
         self.right_dock = RightDock()
         self.right_dock.setObjectName("RightDock")
 
-        # Widgets
+        # Widgets. Left.
         self.control_panel = ControlWidget()
+        self.gizmo_panel = GizmoWidget()
         self.program_panel = ProgramWidget(initial_dir=self.settings.value("last_directory", QDir.homePath()))
         self.scene_panel = SceneWidget()
+        # Right.
         self.dro_panel = DROWidget()
         self.teach_panel = TeachWidget()
         self.vision_panel = VisionWidget(calibration_image_dir=self.settings.value("camera_calibration_directory", QDir.homePath()))
         self.terminal = self.terminal_dock.widget()
 
-        # Tabify
-        self.left_dock.tabs.addTab(self.control_panel, "Control")
+        # Tabify. Left.
+        self.left_dock.tabs.addTab(self.control_panel, "Jog")
+        self.left_dock.tabs.addTab(self.gizmo_panel, "Gizmo")
         self.left_dock.tabs.addTab(self.program_panel, "Program")
         self.left_dock.tabs.addTab(self.scene_panel, "Scene")
+        # Right.
         self.right_dock.tabs.addTab(self.dro_panel, "DRO")
         self.right_dock.tabs.addTab(self.teach_panel, "Teach")
         self.right_dock.tabs.addTab(self.vision_panel, "Vision")
 
-        # Viewport
+        # Viewport.
         self.view_scene = OpenGLViewport()              # 3D scene.
         self.view_camera = CameraWidget()               # Camera.
         self.viewport_tabs = QTabWidget()

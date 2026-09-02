@@ -39,7 +39,8 @@ class SceneGraph(QAbstractItemModel):
         # self.add_node(parent_idx=QModelIndex(), node=ellipsoid_node)
 
         # Attach gizmo.
-        tool_node = self._robot_sys.state.planned.manipulator.link_nodes["ToolFrame"]
+        # tool_node = self._robot_sys.state.planned.manipulator.link_nodes["ToolFrame"]
+        tool_node = self._robot_sys.state.planned.manipulator.link_nodes["PenHolder"]
         tool_node.gizmo = Gizmo(tool_node)
 
     def size(self):

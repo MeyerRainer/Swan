@@ -61,7 +61,7 @@ class VisionSystem(QObject):
                                 id1=5, id2=43, marker_size=0.040, marker_gap=0.040))
 
         self.ttt_detector: TTTDetector = TTTDetector("models/tic_tac_toe/train-7/best.onnx")  # YOLO-based detector.
-        self.ttt_board: TTTBoard = TTTBoard()       # Game board.
+        self.ttt_board: TTTBoard = TTTBoard(msg_callback=self.sgn_message.emit)       # Game board.
         self.frame_overlay = Overlay()              # Frame overlay.
 
         # Vision processing

@@ -5,6 +5,7 @@ Author: Rainer Meyer, rot.meyer494@gmail.com
 from PyQt6.QtCore import QObject, pyqtSignal
 import numpy as np
 from typing import Optional
+from scipy import optimize
 
 from robot_manipulator.system_state import SystemState, ControllerState
 from robot_manipulator.manipulator import Manipulator
@@ -91,21 +92,22 @@ class RobotSystem(QObject):
     #         iters += 1
     #     return True
 
-    def plan(self) -> None:
-        pose_world: Pose = self._manipulator.state.planner.link_nodes["ToolFrame"].pose  # World frame
-        pose_base: Pose = pose_world.relative_to(self.state.mcu.linear_axis.pose)
-
-        mot_vec = self._manipulator.request_cartesian_move(pose_base)
-        if mot_vec is None:
-            return
-        self._manipulator.state.planner.motor_state = mot_vec
-        self._linear_axis.state.planned.joint_state = np.array([0.])
+    # def plan(self) -> None:
+    #     pose_world: Pose = self._manipulator.state.planner.link_nodes["ToolFrame"].pose  # World frame
+    #     pose_base: Pose = pose_world.relative_to(self.state.mcu.linear_axis.pose)
+    #
+    #     mot_vec = self._manipulator.request_cartesian_move(pose_base)
+    #     if mot_vec is None:
+    #         return
+    #     self._manipulator.state.planner.motor_state = mot_vec
+    #     self._linear_axis.state.planned.joint_state = np.array([0.])
 
     def plan_8d(self) -> None:
-        pose_world: Pose = self._manipulator.state.planner.link_nodes["ToolFrame"].pose  # World frame
+        pose_world: Pose = self._manipulator.state.planner.link_nodes["PenHolder"].pose  # World frame
 
         mot_vec: np.ndarray = self.move_cartesian_8d(pose_world)
         if mot_vec is None:
+            self.send_terminal.emit(f"Failed to compute joint solution for planned pose.")
             return
 
         self.state.planned.motor_state = mot_vec
@@ -233,52 +235,70 @@ class RobotSystem(QObject):
         return True
 
     def move_cartesian_8d(self, target_pose: Pose, time_seconds: Optional[float] = None) -> Optional[np.ndarray]:
-        """ Moves to cartesian space using 7 axis.
+        """ Moves to cartesian space using 7 axis (6-DOF arm + 1-DOF rail).
         :param target_pose: Target pose in world frame.
         :param time_seconds: Motion time in seconds.
-        :return: True if motion accepted.
+        :return: 8-DOF joint motion vector or None if unfeasible.
         """
-        current_base_pose = self.state.queued.linear_axis.pose
+        current_base_x = self.state.queued.linear_axis.pose.position[0]
 
-        # For maximum manipulability, the target is at this distance from manipulator base.
-        distance_desired = np.float64(np.sqrt(2)*config.CHAR_LEN)
+        # Preferred distance to manipulator base to maximize manipulability.
+        distance_desired = np.sqrt(2) * config.CHAR_LEN
 
-        # Target XYZ coordinates relative to robot base at zero linear axis joints.
-        target_wrt_zero_base: np.ndarray = target_pose.position - config.BASE_OFFSET
+        # Linear rail limits in world coordinates.
+        x_min = 0.001 * config.JOINT_LINEAR_LIMITS["JL1_MIN"] + config.BASE_OFFSET[0]
+        x_max = 0.001 * config.JOINT_LINEAR_LIMITS["JL1_MAX"] + config.BASE_OFFSET[0]
 
-        # Y-distance less than ideal distance -> two solutions.
-        if target_wrt_zero_base[1] < distance_desired:
-            discriminant: np.float64 = np.sqrt(distance_desired ** 2 - target_wrt_zero_base[1] ** 2, dtype=np.float64)
+        # Target relative to base offset (ignoring rail x displacement).
+        target_position: np.ndarray = target_pose.position
+        base_offset: np.ndarray = config.BASE_OFFSET.copy()
 
-            # Base x-positions in world frame, meters. Choose closer to previous solution.
-            x_solutions = [target_pose.position[0] + discriminant, target_pose.position[0] - discriminant]
-            x_solutions.sort(key=lambda new_x: np.abs(new_x - current_base_pose.position[0]))
-            x = x_solutions[0]
+        # Objective function for the scalar optimizer.
+        def rail_objective(x_rail: float) -> float:
+            """
+            :param x_rail:
+            :return:
+            """
+            # Distance from rail-positioned base to target in XY plane.
+            dx = target_position[0] - x_rail
+            dy = target_position[1] - base_offset[1]
+            dz = target_position[2] - base_offset[2]
+            dist_3d = np.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
 
-        else:  # One solution
-            x = target_pose.position[0]
-            x = np.clip(x, 0.001*config.JOINT_LINEAR_LIMITS["JL1_MIN"], 0.001*config.JOINT_LINEAR_LIMITS["JL1_MAX"])
+            # Cost 1: Deviation from optimal manipulability distance.
+            w_manip = 1.0
+            cost_manip = w_manip * (dist_3d - distance_desired) ** 2
 
-        # Compute pose of manipulator base.
-        new_base_offset: np.ndarray = config.BASE_OFFSET.copy()
-        new_base_offset[0] = x
-        new_base_pose: Pose = Pose.from_position(new_base_offset)
+            # Cost 2: Preference for minimal rail motion.
+            w_smooth = 0.2
+            cost_smooth = w_smooth * (x_rail - current_base_x) ** 2
 
-        # Target
-        manipulator_target: Pose = target_pose.relative_to(new_base_pose)
-        # print(f"Tool w.r.t. world: {target_pose}")
-        # print(f"Tool w.r.t. current base: {manipulator_target}")
-        linear_axis_target: np.ndarray = np.array([x - config.BASE_OFFSET[0]])  # Absolute position for linear joint in meters.
+            return cost_manip + cost_smooth
 
-        # Ensure motion is executable.
-        mot_vec_manipulator: np.ndarray = self._manipulator.request_cartesian_move(manipulator_target)
-        mot_vec_linear_axis: np.ndarray = self._linear_axis.request_joint_move(linear_axis_target)
+        # Solve bounded 1D optimization for linear rail position within limits.
+        res = optimize.minimize_scalar(rail_objective, bounds=(x_min, x_max), method='bounded')
+        x_optimal = res.x
+
+        # Compute target pose relative to updated base position.
+        new_base_offset = config.BASE_OFFSET.copy()
+        new_base_offset[0] = x_optimal
+        new_base_pose = Pose.from_position(new_base_offset)
+        current_base_x = new_base_pose.position[0]
+        manipulator_target = target_pose.relative_to(new_base_pose)
+        linear_axis_target = np.array([x_optimal - config.BASE_OFFSET[0]])
+
+        # Request motor coordinates from manipulator and linear rail.
+        mot_vec_manipulator = self._manipulator.request_cartesian_move(manipulator_target)
+        mot_vec_linear_axis = self._linear_axis.request_joint_move(linear_axis_target)
+
         if mot_vec_manipulator is None or mot_vec_linear_axis is None:
             return None
 
-        mot_vec: np.ndarray = np.zeros(8, dtype=np.float64)
+        # Solution found.
+        mot_vec = np.zeros(8, dtype=np.float64)
         mot_vec[:config.N_REV_JNT] = mot_vec_manipulator
         mot_vec[config.N_REV_JNT:config.N_JNT] = mot_vec_linear_axis
+
         return mot_vec
 
     def translate_tool(self, direction_vec: tuple[int, int, int], distance: float, speed: float, frame: str) -> bool:
@@ -326,6 +346,9 @@ class RobotSystem(QObject):
         """
         mot_vec: np.ndarray = self.state.planned.motor_state
         self.sys_motor_move_8d(mot_vec, time=10)
+
+    def revert_planned(self):
+        self.state.planned.motor_state_ctrl_units = self.state.mcu.motor_state_ctrl_units
 
     def reset(self):
         self._manipulator.reset()

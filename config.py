@@ -36,8 +36,8 @@ JOINT_LIMITS = {
 }
 
 JOINT_LINEAR_LIMITS = {
-    'JL1_MAX': 200,
-    'JL1_MIN': -200,
+    'JL1_MAX': 170,
+    'JL1_MIN': -170,
     'JL2_MAX': 0,
     'JL2_MIN': 0,
 }
@@ -80,12 +80,12 @@ FRAMES = ("World", "Base", "Tool")
 
 # Denavit-Hartenberg parameters
 DH_TABLE: List[dict] = [
-    {'a': np.float64(0.030), 'alpha': np.float64(math.pi/2),    'd': np.float64(0.130), 'nu_offset': np.float64(0.000)},
-    {'a': np.float64(0.160), 'alpha': np.float64(0.000),        'd': np.float64(0.000), 'nu_offset': np.float64(math.pi/2)},
-    {'a': np.float64(0.035), 'alpha': np.float64(math.pi/2),    'd': np.float64(0.000), 'nu_offset': np.float64(0.000)},
-    {'a': np.float64(0.000), 'alpha': np.float64(-math.pi/2),   'd': np.float64(0.195), 'nu_offset': np.float64(0.000)},
-    {'a': np.float64(0.000), 'alpha': np.float64(math.pi/2),    'd': np.float64(0.000), 'nu_offset': np.float64(0.000)},
-    {'a': np.float64(0.000), 'alpha': np.float64(0.000),        'd': np.float64(0.0353), 'nu_offset': np.float64(0.000)},
+    {'a': np.float64(0.030), 'alpha': np.float64(math.pi/2),    'd': np.float64(0.130), 'nu_offset': np.float64(0.000)},        # Base to Link1
+    {'a': np.float64(0.160), 'alpha': np.float64(0.000),        'd': np.float64(0.000), 'nu_offset': np.float64(math.pi/2)},    # Link1 to Link2
+    {'a': np.float64(0.035), 'alpha': np.float64(math.pi/2),    'd': np.float64(0.000), 'nu_offset': np.float64(0.000)},        # Link2 to Link3
+    {'a': np.float64(0.000), 'alpha': np.float64(-math.pi/2),   'd': np.float64(0.195), 'nu_offset': np.float64(0.000)},        # Link3 to Link4
+    {'a': np.float64(0.000), 'alpha': np.float64(math.pi/2),    'd': np.float64(0.000), 'nu_offset': np.float64(0.000)},        # Link4 to Link5
+    {'a': np.float64(0.000), 'alpha': np.float64(0.000),        'd': np.float64(0.0303), 'nu_offset': np.float64(0.000)},       # Link6 to tool flange.
 ]
 
 # Spring geometry
@@ -103,13 +103,19 @@ CHAR_LEN = np.float64(0.2)  # Characteristic length, m
 # BASE_OFFSET = np.array([0.225, 0.380, 0.0], dtype=np.float64)  # Offset from world origin to base at zero linear joints.
 BASE_OFFSET = np.array([0.440, 0.380, 0.0], dtype=np.float64)  # Offset from world origin to base at zero linear joints. (Mid-rail)
 
-# Tool frame respect to J6 frame
+# Tool frame respect to tool flange
+# Tool frame object
+# TOOL_OFS = np.array([
+#     [1., 0., 0., 0.000],
+#     [0., 1., 0., 0.000],
+#     [0., 0., 1., 0.005],
+#     [0., 0., 0., 1.000]], dtype=np.float64)
+# Pen holder
 TOOL_OFS = np.array([
-    [1., 0., 0., 0.000],
-    [0., 1., 0., 0.000],
-    [0., 0., 1., 0.000],
-    [0., 0., 0., 1.000]], dtype=np.float64)
-# TOOL_OFS[:3, :3] = utils.zyz2rot_mat(np.array([0, -math.pi/4, 0]), dtype=np.float64)
+    [0., 0., 1., -0.1158],
+    [0., -1., 0., 0.0345],
+    [1., 0., 0., 0.0195],
+    [0., 0., 0., 1.0000]], dtype=np.float64)
 INV_TOOL_OFS = np.linalg.inv(TOOL_OFS)
 
 # Calibration board w.r.t. world frame. (World to cal.board. transformation)

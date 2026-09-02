@@ -46,7 +46,7 @@ class ControlWidget(QWidget):
 
         self.home_button = QPushButton("Home")
         self.enable_button = QPushButton("Enable")
-        self.execute_button = QPushButton("Execute Planned")
+        self.free_button2 = QPushButton("")
         self.free_button = QPushButton("")
 
         self.radio_button_jnt = QRadioButton("Joint")
@@ -130,7 +130,7 @@ class ControlWidget(QWidget):
         g_option_layout = QGridLayout()
         g_option_layout.addWidget(self.home_button, 0, 0)
         g_option_layout.addWidget(self.enable_button, 0, 1)
-        g_option_layout.addWidget(self.execute_button, 1, 0)
+        g_option_layout.addWidget(self.free_button2, 1, 0)
         g_option_layout.addWidget(self.free_button, 1, 1)
 
         v_motion_layout.addLayout(g_option_layout)
