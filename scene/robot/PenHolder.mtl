@@ -1,7 +1,7 @@
 # Blender 5.1.1 MTL File: 'PenHolder.blend'
 # www.blender.org
 
-newmtl ABS_(White).012
+newmtl ABS_(White).001
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.964706 0.964706 0.952941
@@ -11,7 +11,7 @@ Ni 1.500000
 d 1.000000
 illum 1
 
-newmtl Opaque(63,63,63).008
+newmtl Opaque(63,63,63).001
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.247059 0.247059 0.247059
@@ -21,7 +21,7 @@ Ni 1.500000
 d 1.000000
 illum 1
 
-newmtl Paint_-_Enamel_Glossy_(Green).002
+newmtl Paint_-_Enamel_Glossy_(Green).004
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.266667 0.588235 0.282353
@@ -31,7 +31,7 @@ Ni 1.500000
 d 1.000000
 illum 1
 
-newmtl Paint_-_Enamel_Glossy_(Red).002
+newmtl Paint_-_Enamel_Glossy_(Red).004
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.768627 0.207843 0.152941
@@ -41,7 +41,7 @@ Ni 1.500000
 d 1.000000
 illum 1
 
-newmtl Stainless_Steel_-_Satin.004
+newmtl Stainless_Steel_-_Satin.001
 Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.796078 0.796078 0.796078

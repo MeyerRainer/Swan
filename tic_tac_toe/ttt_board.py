@@ -11,7 +11,7 @@ from vision.pose_estimator import PoseEstimatorOutput
 
 @dataclass
 class MachineMoveRequest:
-    center: Optional[Pose] = None
+    mark_world_pose: Optional[Pose] = None
     mark: Optional[str] = None
 
 
@@ -127,7 +127,7 @@ class TTTBoard(GameBoard):
         """ Update gameboard based on detections.
         :param camera_calibration: Intrinsic camera calibration parameters.
         :param ttt_detection: YOLO-detection of game state.
-        :param board_pose_estimation: ArUco-based pose estimation of game board pose.
+        :param board_pose_estimation: ArUco-based pose estimation of the game board. Board w.r.t. camera.
         """
 
         for i in ttt_detection.indices:
@@ -165,9 +165,15 @@ class TTTBoard(GameBoard):
             if self.board[i][j] != ' ':
                 continue
 
-            return self._add_mark(grid_coords[0], grid_coords[1], mark)
+            mark_center_world_coords: np.ndarray = self._add_mark(grid_coords[0], grid_coords[1], mark)
+            if mark_center_world_coords is not None:
+                # X's pose with respect to world frame.
+                # x_world_pose: Pose = Pose.from_rot_mat(pos=mark_center_world_coords, R=camera_calibration.extrinsic.rot_mat @ board_pose_estimation.marker_pose.rot_mat)
+                # print(x_world_pose)
+                # return MachineMoveRequest(mark_world_pose=x_world_pose, mark=mark)
+                return MachineMoveRequest(mark_world_pose=Pose.from_position(mark_center_world_coords), mark=mark)
 
-    def _add_mark(self, i: int, j: int, mark: str) -> bool:
+    def _add_mark(self, i: int, j: int, mark: str) -> Optional[np.ndarray]:
         # New mark. Add to board.
         self.msg_callback(f"Board updated. Mark {mark} added at X:{i} Y:{j}.")
         self.board[i][j] = mark
@@ -177,10 +183,10 @@ class TTTBoard(GameBoard):
             draw: bool = True if score == 0 else False
             if draw:
                 self.msg_callback(f"Game over. Draw.")
-                return False
+                return None
             winner = "machine" if score == -10 else "player"
             self.msg_callback(f"Game over. {winner} wins.")
-            return False
+            return None
 
         if mark == "O":  # Set by machine.
             self.players_turn = True
@@ -190,14 +196,16 @@ class TTTBoard(GameBoard):
             machine_move = self.make_machine_move()
             if machine_move:
                 board_coords: np.ndarray = self.grid2board(machine_move[0], machine_move[1])
-                world_coords: np.ndarray = self.board2world(board_coords)
+                mark_center_world_coords: np.ndarray = self.board2world(board_coords)
                 # self.msg_callback(f"Board coords: {board_coords}")
                 self.msg_callback(f"Machine move to grid X:{machine_move[0]:.3f}Y:{machine_move[1]:.3f}.")
-                self.msg_callback(f"World coordinates: X:{world_coords[0]:.3f}Y:{world_coords[1]:.3f}Z:{world_coords[2]:.3f}.")
+                self.msg_callback(f"World coordinates: X:{mark_center_world_coords[0]:.3f}Y:{mark_center_world_coords[1]:.3f}Z:{mark_center_world_coords[2]:.3f}.")
+                return mark_center_world_coords
+                #return MachineMoveRequest(center=Pose.from_position(mark_center_world_coords), mark="O")
             else:
                 self.msg_callback(f"Machine move solver failed.")
 
-        return True
+        return None
 
     # Tic-tac-toe algorithm based on Dasari Anji's implementation:
     # (https://medium.com/@dasarianjilrsa/solving-tic-tac-toe-using-python-a-comprehensive-guide-e8e51aa82f2b)

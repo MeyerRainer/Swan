@@ -227,6 +227,66 @@ class Manipulator:
         # All interpolation points computed successfully
         return mot_vecs, segment_time
 
+    # def request_cartesian_circle_move(self, target_pose: Pose, center: Pose, speed_tangential: float = None, segment_length_m: float = 0.001) -> Optional[Tuple[np.ndarray, float]]:
+    #     """ Linear move in operational space  coordinates.
+    #     :param target_pose: Target 6D-Pose in manipulator frame
+    #     :param center:
+    #     :param speed_tangential: m/s, arc tangent speed.
+    #     :param segment_length_m: m, Length of translational segment.
+    #     :return: True if move was executed
+    #     """
+    #     current_pose: Pose = self.state.queued.ops_state
+    #
+    #     eps: float = 1e-4  # Tolerance.
+    #
+    #     # Circle too small.
+    #     radius: float = current_pose.distance(center)
+    #     if radius < eps:
+    #         return None
+    #
+    #     if abs(center.distance(current_pose) - center.distance(target_pose)) < eps:
+    #         return None
+    #
+    #     # Full circle
+    #     if current_pose.is_close(target_pose):
+    #         # Define plane somehow
+    #         ...
+    #
+    #     # Translational error, meters
+    #     circumference_length: float =
+    #     n_segments = int(np.ceil(tool_translation_dist / segment_length_m))
+    #
+    #
+    #     # Choose whether rotation or translation determines segment count
+    #
+    #     # Compute movement time (seconds)
+    #     if speed_tangential is not None:
+    #         raise ValueError("Linear movement needs speed specified.")
+    #
+    #     segment_time = move_time / n_segments  # Seconds
+    #
+    #     current_jnt_vec = self.state.queued.joint_state
+    #     mot_vecs = np.zeros((n_segments, N_REV_JNT))
+    #     for idx in range(n_segments):
+    #         t = (1+idx) / n_segments  # Interpolation parameter in range [0, 1]
+    #         interp_pose = current_pose.interpolate(target_pose, t)
+    #         ik_sol: IkSolution = self.kinematics.inverse(interp_pose, prev_jnt_vec=current_jnt_vec)
+    #         if not ik_sol.success:
+    #             print(f"move_ops_lin: IK fail.")
+    #             return None
+    #         interp_jnt_vec = ik_sol.joint_solution
+    #         current_jnt_vec = interp_jnt_vec.copy()
+    #
+    #         # Propagate motion command forwards
+    #         mot_vec = self._ensure_joint_move(interp_jnt_vec)
+    #         if mot_vec is None:
+    #             return None
+    #
+    #         mot_vecs[idx] = mot_vec
+    #
+    #     # All interpolation points computed successfully
+    #     return mot_vecs, segment_time
+
     def translate_tool(self, direction_vec: tuple[int, int, int], distance: float, speed: float, frame: str) -> Tuple[np.ndarray, float] | None:
         """ Creates a pure translation along any axis in any frame.
         :param direction_vec: Translation axis, any length

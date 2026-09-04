@@ -7,6 +7,8 @@ from PyQt6.QtCore import QObject
 import numpy as np
 
 from robot_math import utils
+from robot_math.pose import Pose
+from robot_math.zyz_euler import ZYZEuler
 
 
 class ApplicationController(QObject):
@@ -37,10 +39,9 @@ class ApplicationController(QObject):
         self.main_window.toolbar.hold_resume_button.clicked.connect(self.app_context.robot_sys.toggle_feed_hold)
         # Context -> GUI
 
-        # ======================================== Control panel =========================================
+        # ========================================= Jog panel ==========================================
         self.main_window.control_panel.home_button.clicked.connect(self.home)
-        self.main_window.gizmo_panel.execute_planned_button.clicked.connect(self.app_context.robot_sys.execute_planned)
-        self.main_window.gizmo_panel.revert_planned_button.clicked.connect(self.app_context.robot_sys.revert_planned)
+
         # Translation
         self.main_window.control_panel.x_plus.clicked.connect(lambda: self.translate_robot_sys(direction=(1, 0, 0)))
         self.main_window.control_panel.x_minus.clicked.connect(lambda: self.translate_robot_sys(direction=(-1, 0, 0)))
@@ -69,6 +70,10 @@ class ApplicationController(QObject):
         # self.main_window.control_panel.j7_slider.connect_target(self.read_sliders)
         self.main_window.control_panel.jl1_slider.connect_target(self.joint_move_robot_sys)
         # self.main_window.control_panel.jl2_slider.connect_target(self.read_sliders)
+
+        # ======================================== Gizmo panel =========================================
+        self.main_window.gizmo_panel.execute_planned_button.clicked.connect(self.app_context.robot_sys.execute_planned)
+        self.main_window.gizmo_panel.revert_planned_button.clicked.connect(self.app_context.robot_sys.revert_planned)
 
         # ========================================= Robot system =========================================
         self.app_context.robot_sys.send_terminal.connect(self.main_window.terminal.write)
@@ -149,22 +154,22 @@ class ApplicationController(QObject):
         jnt_vec = np.array([j1, j2, j3, j4, j5, j6, j7, j8])
         speed = utils.deg_min2rad_sec(self.main_window.control_panel.speed_joint.value())
 
-        self.app_context.robot_sys.sys_joint_move_8d(jnt_vec, time=None, speed=speed)
+        self.app_context.robot_sys.move_joint_8d(jnt_vec, time=None, speed=speed)
 
     def translate_robot_sys(self, direction: Tuple[int, int, int]):
         distance: float = self.main_window.control_panel.increment_linear.value() / 1000       # m
         speed: float = utils.mm_min2m_s(self.main_window.control_panel.speed_linear.value())    # m/s
         frame: str = self.main_window.control_panel.frame_select_position.currentText()
-        self.app_context.robot_sys.translate_tool(direction_vec=direction, distance=distance, speed=speed, frame=frame)
+        self.app_context.robot_sys.translate_tool_6d(direction_vec=direction, distance=distance, speed=speed, frame=frame)
 
     def rotate_robot_sys(self, direction: Tuple[int, int, int]):
         frame: str = self.main_window.control_panel.frame_select_orientation.currentText()
         angle_increment: float = np.deg2rad(self.main_window.control_panel.increment_angular.value())
         speed: float = utils.deg_min2rad_sec(self.main_window.control_panel.speed_angular.value())
-        self.app_context.robot_sys.rotate_tool(direction_vec=direction, angle=angle_increment, speed=speed, frame=frame)
+        self.app_context.robot_sys.rotate_tool_6d(direction_vec=direction, angle=angle_increment, speed=speed, frame=frame)
 
     def home(self):
-        self.app_context.robot_sys.sys_joint_move_8d(np.zeros(8), time=None, speed=utils.deg_min2rad_sec(self.main_window.control_panel.speed_joint.value()))
+        self.app_context.robot_sys.move_joint_8d(np.zeros(8), time=None, speed=utils.deg_min2rad_sec(self.main_window.control_panel.speed_joint.value()))
 
 
     def on_status_update(self, grbl_status_str):

@@ -4,7 +4,7 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Tuple, Optional
 
 from robot_math.quaternion import Quaternion
 from robot_math.zyz_euler import ZYZEuler
@@ -45,7 +45,7 @@ class Pose:
     def from_quaternion(cls, pos: np.ndarray, quat: Quaternion) -> Pose:
         SE3 = np.eye(4, dtype=np.float64)
         SE3[:3, 3] = pos
-        SE3[:3, :3] = quat.to_rotation_matrix()
+        SE3[:3, :3] = quat.to_rot_mat()
         return cls(SE3)
 
     @classmethod
@@ -69,7 +69,7 @@ class Pose:
 
     @property
     def quaternion(self) -> Quaternion:
-        return Quaternion.from_rotation_matrix(self.pose[:3, :3])
+        return Quaternion.from_rot_mat(self.pose[:3, :3])
 
     @property
     def rot_mat(self) -> np.ndarray:
@@ -109,7 +109,7 @@ class Pose:
     # Set orientation using quaternion.
     @quaternion.setter
     def quaternion(self, quat: Quaternion) -> None:
-        self.pose[:3, :3] = quat.to_rotation_matrix()
+        self.pose[:3, :3] = quat.to_rot_mat()
 
     # Set orientation using rotation matrix.
     @rot_mat.setter
@@ -177,6 +177,11 @@ class Pose:
         vec_in[:3, 0] = vec
         vec_out: np.ndarray = self.SE3 @ vec_in
         return vec_out[:3, 0].flatten()
+
+    def offset(self, pos_offset: np.ndarray) -> Pose:
+        offset_pose = self.copy()
+        offset_pose.position += pos_offset
+        return offset_pose
 
     # Rotate around x.
     def rotate_x(self, angle: float, degrees=False, body_frame=True) -> None:
@@ -272,21 +277,70 @@ class Pose:
         inter_quaternion = self.quaternion.slerp(other.quaternion, t)
         return Pose.from_quaternion(pos=inter_position, quat=inter_quaternion)
 
-    def arc_interpolate(self, end: Pose, arc_center: np.ndarray, arc_normal: np.ndarray, angle: float, t: float = 0.5) -> Pose:
-        """ Interpolates over arc
-        :param end: End Pose.
-        :param arc_center: Center point of arc.
-        :param arc_normal: Normalized rotation axis.
-        :param angle: Angle of rotation in radians.
+    def arc_interpolate(self, other: Pose, center: np.ndarray, normal: np.ndarray, total_angle: float, t: float = 0.5):
+        """ Interpolates a pose along a circular arc.
+        :param other: Pose object representing the end pose.
+        :param center: Center point of the circular arc.
+        :param normal: Normal vector of the circle plane.
+        :param total_angle: Total sweep angle of the arc in radians.
         :param t: Interpolation parameter in range [0, 1].
+        :return: Pose: Interpolated pose at parameter t.
         """
-        v: np.ndarray = self.position - arc_center  # Center -> start point vector.
-        theta: float = t * angle
-        cos_theta: float = np.cos(theta)
-        # Position by Rodrigues' formula:
-        inter_position = arc_center + v*cos_theta + np.cross(arc_normal, v)*np.sin(theta) + arc_normal*np.dot(arc_normal, v)*(1-cos_theta)
-        inter_quaternion: Quaternion = self.quaternion.slerp(end.quaternion, t=t)
-        return Pose.from_quaternion(pos=inter_position, quat=inter_quaternion)
+        n = normal / np.linalg.norm(normal)
+
+        theta_t = total_angle * t  # Current sweep angle.
+
+        # Local frame and position on arc at t=0.
+        p_start = self.position
+        r_start = p_start - center
+        radius = np.linalg.norm(r_start)
+        u_radial_start = r_start / radius
+        u_tangent_start = np.cross(n, u_radial_start)
+        R_frame_start = np.column_stack((u_tangent_start, u_radial_start, n))
+
+        # Local frame and interpolated position on the arc at t=t.
+        p_t = center + radius * (np.cos(theta_t) * u_radial_start + np.sin(theta_t) * u_tangent_start)
+        u_radial_t = (p_t - center) / radius
+        u_tangent_t = np.cross(n, u_radial_t)
+        R_frame_t: np.ndarray = np.column_stack((u_tangent_t, u_radial_t, n))
+
+        # End position on the arc at t=1 and its frame.
+        p_end = other.position
+        u_radial_end = (p_end - center) / np.linalg.norm(p_end - center)
+        u_tangent_end = np.cross(n, u_radial_end)
+        R_frame_end = np.column_stack((u_tangent_end, u_radial_end, n))
+
+        # Orientation interpolation relative to local frames.
+        q_start: Quaternion = self.quaternion
+        q_end: Quaternion = other.quaternion
+
+        # Compute relative orientations w.r.t the local path frames.
+        q_rel_start = q_start.relative_to(Quaternion.from_rot_mat(R_frame_start))
+        q_rel_end = q_end.relative_to(Quaternion.from_rot_mat(R_frame_end))
+
+        # SLERP between the relative orientations.
+        q_rel_t = q_rel_start.slerp(q_rel_end, t)
+
+        # Transform back to world frame using current path frame at t
+        q_t: Quaternion = Quaternion.from_rot_mat(R_frame_t) * q_rel_t
+
+        return Pose.from_quaternion(pos=p_t, quat=q_t)
+
+    # def arc_interpolate(self, end: Pose, arc_center: np.ndarray, arc_normal: np.ndarray, angle: float, t: float = 0.5) -> Pose:
+    #     """ Interpolates over arc
+    #     :param end: End Pose.
+    #     :param arc_center: Center point of arc.
+    #     :param arc_normal: Normalized rotation axis.
+    #     :param angle: Angle of rotation in radians.
+    #     :param t: Interpolation parameter in range [0, 1].
+    #     """
+    #     v: np.ndarray = self.position - arc_center  # Center -> start point vector.
+    #     theta: float = t * angle
+    #     cos_theta: float = np.cos(theta)
+    #     # Position by Rodrigues' formula:
+    #     inter_position = arc_center + v*cos_theta + np.cross(arc_normal, v)*np.sin(theta) + arc_normal*np.dot(arc_normal, v)*(1-cos_theta)
+    #     inter_quaternion: Quaternion = self.quaternion.slerp(end.quaternion, t=t)
+    #     return Pose.from_quaternion(pos=inter_position, quat=inter_quaternion)
 
     def is_close(self, other: Pose) -> bool:
         if not isinstance(other, Pose):

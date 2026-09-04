@@ -2,11 +2,12 @@
 
 Author: Rainer Meyer, rot.meyer494@gmail.com
 """
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 import numpy as np
-from typing import Optional
+from typing import Optional, Tuple
 from scipy import optimize
 
+from robot_manipulator.kinematics.anthropomorphic_spherical_wrist import IkSolution
 from robot_manipulator.system_state import SystemState, ControllerState
 from robot_manipulator.manipulator import Manipulator
 from robot_manipulator.linear_axis import LinearAxis
@@ -36,87 +37,11 @@ class RobotSystem(QObject):
         self.speed_linear_prev = 0.
         self.speed_angular_prev = 0.
 
-    # def move_lin_7d(self, end_pose: Pose, stepping_rate: float = 1e-4) -> bool:
-    #     """ Numerical inverse kinematics to solve 7 joints for given pose and an additional criteria
-    #     @param pose: Desired end posture
-    #     @param criteria: Additional criteria for specific joint solution
-    #     """
-    #
-    #     # pos_error: float  = current_pose.distance(end_pose)
-    #     # ang_error: float = current_pose.quaternion.angle(end_pose.quaternion)
-    #
-    #     converge = False
-    #     iters = 0
-    #     while not converge and iters < 1000:
-    #         current_pose: Pose = self.state.queued_pose
-    #         if current_pose.distance(end_pose) < 0.001:  # 1mm
-    #             return True
-    #         trans_dir: np.ndarray = current_pose.translation_direction(end_pose)
-    #         rot_dir: np.ndarray = current_pose.rotation_direction(end_pose)
-    #         dx: np.ndarray = stepping_rate * np.hstack((trans_dir, rot_dir)).T  # 6-vector
-    #
-    #         # Fetch jacobian and do pseudo inverse
-    #         J = self.state.queued_jacobian
-    #         J_pinv = LA.pinv(J)
-    #         dq = J_pinv @ dx
-    #         jnt_vec = self.state.queued_motors
-    #         jnt_vec[:7] += dq
-    #         self.sys_motor_move(jnt_vec)
-    #         iters += 1
-    #     return True
-    #
-    # def move_null(self, null_vec: np.ndarray, criteria) -> bool:
-    #     quat_err = utils.quat_multiply(quat_desired, quat_current.inv)
-    #     Quaternion error to rotation vector (for small errors only)
-    #     rot_vec = 2 * quat_err[1:]  # Small angle approximation
-    #     delta_x = np.hstack((pos_err, rot_vec)).T
-    #
-    #     current_pose: Pose = self.state.queued_pose
-    #     if current_pose.distance(end_pose) > 0.010:
-    #         return False
-    #
-    #     max_iters = 200
-    #     iteration = 0
-    #     temp_jnt_vec = np.zeros(8)
-    #     while iteration < max_iters:
-    #         # Unit directions of motion.
-    #         trans_dir: np.ndarray = current_pose.translation_direction(end_pose)
-    #         rot_dir: np.ndarray = current_pose.rotation_direction(end_pose)
-    #
-    #         # Fetch jacobian and do pseudo inverse
-    #         J = self.state.queued_jacobian
-    #         if LA.det(J) < 0.001:
-    #             return False
-    #         J_pinv = LA.pinv(J)
-    #         delta_q = J_pinv @ delta_x
-    #         iters += 1
-    #     return True
-
-    # def plan(self) -> None:
-    #     pose_world: Pose = self._manipulator.state.planner.link_nodes["ToolFrame"].pose  # World frame
-    #     pose_base: Pose = pose_world.relative_to(self.state.mcu.linear_axis.pose)
-    #
-    #     mot_vec = self._manipulator.request_cartesian_move(pose_base)
-    #     if mot_vec is None:
-    #         return
-    #     self._manipulator.state.planner.motor_state = mot_vec
-    #     self._linear_axis.state.planned.joint_state = np.array([0.])
-
-    def plan_8d(self) -> None:
-        pose_world: Pose = self._manipulator.state.planner.link_nodes["PenHolder"].pose  # World frame
-
-        mot_vec: np.ndarray = self.move_cartesian_8d(pose_world)
-        if mot_vec is None:
-            self.send_terminal.emit(f"Failed to compute joint solution for planned pose.")
-            return
-
-        self.state.planned.motor_state = mot_vec
-
-    def sys_queue_move(self, mot_vec_manipulator: Optional[np.ndarray] = None,
-                       mot_vec_linear_axis: Optional[np.ndarray] = None,
-                       time: Optional[float] = None,
-                       speed: Optional[float] = None,
-                       incremental=False) -> bool:
+    def _sys_queue_move(self, mot_vec_manipulator: Optional[np.ndarray] = None,
+                        mot_vec_linear_axis: Optional[np.ndarray] = None,
+                        time: Optional[float] = None,
+                        speed: Optional[float] = None,
+                        incremental=False) -> bool:
         """ Constructs an 8-vector of absolute motor coordinates in controller generalized units,
         limits the feedrate and sends the vector to motion queue.
         @:param mot_vec_manipulator: Desired absolute coordinates for manipulator in radians
@@ -175,75 +100,19 @@ class RobotSystem(QObject):
 
         self.state.queued.motor_state_ctrl_units = sys_mot_vec_target_ctrl_units
         self.g_code_generated.emit(g_code)
-        # print(f"write_g_code: {g_code}")
+        # print(f"write_g_code: {g_code}")  # Debug.
 
         return True
 
-    def sys_motor_move_8d(self, mot_vec: np.ndarray, time: float | None = None, speed: float | None = None) -> bool:
-        """ Move 8-joint
-        :param mot_vec: 8-vector, radians and meters
-        :param time: Motion time in seconds
-        :param speed: Motion speed in rad/s
-        """
-        mot_vec_manipulator_rad = mot_vec[:config.N_REV_JNT]
-        mot_vec_linear_axis_m = mot_vec[config.N_REV_JNT:config.N_JNT]
-
-        mot_vec_man = self._manipulator.request_motor_move(mot_vec_manipulator_rad)
-        if mot_vec_man is None:
-            return False
-        mot_vec_lin = self._linear_axis.request_joint_move(mot_vec_linear_axis_m)
-        if mot_vec_lin is None:
-            return False
-
-        # Send to serial
-        self.sys_queue_move(mot_vec_manipulator=mot_vec_man, mot_vec_linear_axis=mot_vec_lin, time=time, speed=speed)
-
-        return True
-
-    def sys_joint_move_8d(self, jnt_vec: np.ndarray, time: float | None = None, speed: float | None = None) -> bool:
-        """ Move 8-joint
-        :param jnt_vec: 8-vector, radians and meters
-        :param time: Motion time in seconds
-        :param speed: Motion speed in rad/s
-        """
-        mot_vec_manipulator_rad = jnt_vec[:config.N_REV_JNT]
-        mot_vec_linear_axis_m = jnt_vec[config.N_REV_JNT:config.N_JNT]
-
-        mot_vec_man = self._manipulator.request_joint_move(mot_vec_manipulator_rad)
-        if mot_vec_man is None:
-            return False
-        mot_vec_lin = self._linear_axis.request_joint_move(mot_vec_linear_axis_m)
-        if mot_vec_lin is None:
-            return False
-
-        # Send to serial
-        self.sys_queue_move(mot_vec_manipulator=mot_vec_man, mot_vec_linear_axis=mot_vec_lin, time=time, speed=speed)
-
-        return True
-
-    def move_cartesian_6d(self, target_pose: Pose, time_seconds: float) -> bool:
-        """ Motor space interpolated motion to given posture.
-        :param target_pose:
-        :param time_seconds:
-        :return:
-        """
-        mot_vec = self._manipulator.request_cartesian_move(target_pose=target_pose)
-        if mot_vec is None:
-            return False
-
-        self.sys_queue_move(mot_vec_manipulator=mot_vec, time=time_seconds)
-        return True
-
-    def move_cartesian_8d(self, target_pose: Pose, time_seconds: Optional[float] = None) -> Optional[np.ndarray]:
-        """ Moves to cartesian space using 7 axis (6-DOF arm + 1-DOF rail).
+    def _request_cartesian_8d(self, target_pose: Pose) -> Optional[np.ndarray]:
+        """ Solve motor coordinates for reaching a target in world space.
         :param target_pose: Target pose in world frame.
-        :param time_seconds: Motion time in seconds.
-        :return: 8-DOF joint motion vector or None if unfeasible.
+        :return: 8-vector of motor coordinates or None if target unreachable.
         """
         current_base_x = self.state.queued.linear_axis.pose.position[0]
 
-        # Preferred distance to manipulator base to maximize manipulability.
-        distance_desired = np.sqrt(2) * config.CHAR_LEN
+        # Preferred distance from manipulator base to target to maximize manipulability.
+        distance_desired = np.sqrt(2) * config.LINK_CHARACTERISTIC_LENGTH
 
         # Linear rail limits in world coordinates.
         x_min = 0.001 * config.JOINT_LINEAR_LIMITS["JL1_MIN"] + config.BASE_OFFSET[0]
@@ -301,7 +170,141 @@ class RobotSystem(QObject):
 
         return mot_vec
 
-    def translate_tool(self, direction_vec: tuple[int, int, int], distance: float, speed: float, frame: str) -> bool:
+    # =============================================================================================
+    # ====================================== Motion commands ======================================
+    # =============================================================================================
+
+    # ?====================================== 7-axis motion =======================================
+    def move_motor_8d(self, mot_vec: np.ndarray, time: float | None = None, speed: float | None = None) -> bool:
+        """ Move 8-joint
+        :param mot_vec: 8-vector, radians and meters
+        :param time: Motion time in seconds
+        :param speed: Motion speed in rad/s
+        :return: True if motion accepted and queued in serial.
+        """
+        # Request for motor coordinates.
+        mot_vec_man = self._manipulator.request_motor_move(mot_vec[:config.N_REV_JNT])
+        mot_vec_lin = self._linear_axis.request_joint_move(mot_vec[config.N_REV_JNT:config.N_JNT]) # joint=motor
+        if mot_vec_man is None or mot_vec_lin is None:
+            return False
+
+        # Send to serial
+        return self._sys_queue_move(mot_vec_manipulator=mot_vec_man, mot_vec_linear_axis=mot_vec_lin, time=time, speed=speed)
+
+    def move_joint_8d(self, jnt_vec: np.ndarray, time: float | None = None, speed: float | None = None) -> bool:
+        """ Move 8-joint
+        :param jnt_vec: 8-vector, radians and meters
+        :param time: Motion time in seconds
+        :param speed: Motion speed in rad/s
+        :return: True if motion accepted and queued in serial.
+        """
+        # Request for motor coordinates.
+        mot_vec_man = self._manipulator.request_joint_move(jnt_vec[:config.N_REV_JNT])
+        mot_vec_lin = self._linear_axis.request_joint_move(jnt_vec[config.N_REV_JNT:config.N_JNT])
+        if mot_vec_man is None or mot_vec_lin is None:
+            return False
+
+        # Send to serial
+        return self._sys_queue_move(mot_vec_manipulator=mot_vec_man, mot_vec_linear_axis=mot_vec_lin, time=time, speed=speed)
+
+    def move_cartesian_8d(self, target_pose: Pose, time_seconds: Optional[float] = None) -> bool:
+        mot_vec: np.ndarray = self._request_cartesian_8d(target_pose)
+        if mot_vec is None:
+            return False
+        return self.move_motor_8d(mot_vec=mot_vec, time=time_seconds)
+
+    # ===================================== Manipulator only  =====================================
+    def move_cartesian_6d(self, target_pose: Pose, time_seconds: float, frame: str = "Base") -> bool:
+        """ Motor space interpolated motion to given posture.
+        :param target_pose:
+        :param time_seconds:
+        :param frame: World or Base
+        :return: True if motion accepted and queued in serial.
+        """
+        if frame == "World":
+            target_pose = target_pose.relative_to(self.state.queued.manipulator.base_pose)
+
+        mot_vec = self._manipulator.request_cartesian_move(target_pose=target_pose)
+        if mot_vec is None:
+            return False
+
+        return self._sys_queue_move(mot_vec_manipulator=mot_vec, time=time_seconds)
+
+    def move_cartesian_linear_6d(self, target_pose: Pose, speed_linear: float = None, speed_angular: float = None,
+                                      segment_length_m: float = 0.001, segment_size_rad: float = 0.0035) -> bool:
+        """ Linear move in operational space  coordinates.
+        :param target_pose: Target 6D-Pose in manipulator frame
+        :param speed_linear: m/s, linear speed. By default, this is used.
+        :param speed_angular: rad/s, rotational speed. Used if no linear speed is given.
+        :param segment_length_m: m, Length of translational segment.
+        :param segment_size_rad: rad, Size of rotational segment.
+        :return: True if move was executed
+        """
+        ret: Optional[Tuple[np.ndarray, float]] = self._manipulator.request_cartesian_linear_move(
+            target_pose, speed_linear, speed_angular, segment_length_m, segment_size_rad)
+
+        if ret is None:
+            return False
+
+        mot_vecs, segment_time = ret  # Unpack motor vectors and segment time.
+        for vec in mot_vecs:
+            self._sys_queue_move(mot_vec_manipulator=vec, time=segment_time)
+
+        return True
+
+    def move_circle_6d(self, target_pose: Pose, speed_tangential: float, center: np.ndarray, normal: np.ndarray, total_angle: float, frame: str = "Base") -> bool:
+        """ Move to target pose along an arc with center point at center, revolving around normal.
+        :param target_pose: Pose object representing the end pose.
+        :param speed_tangential: Tangential speed of arc motion, m/s
+        :param center: Center point of the circular arc.
+        :param normal: Normal vector of the circle plane.
+        :param total_angle: Total sweep angle of the arc in radians.
+        :param frame: Frame in which target is represented. World or Base.
+        :return: True if move was executed
+        """
+
+        current_jnt_vec: np.ndarray = self.state.queued.manipulator.joint_state
+        current_pose: Pose = self.state.queued.manipulator.ops_state
+
+        if current_pose.is_close(target_pose):
+            return False
+
+        # Convert to manipulator base frame
+        if frame == "World":
+            target_pose = target_pose.relative_to(self.state.queued.manipulator.base_pose)
+            center -= self.state.queued.manipulator.base_pose.position
+
+        # Compute movement time (seconds)
+        N_SEGMENT_FULL_REV: int = 40
+        arc_length: float = total_angle * (np.linalg.norm(target_pose.position - center))  # meters.
+        n_segments: int = int(np.ceil(N_SEGMENT_FULL_REV * total_angle * 0.5 / np.pi))
+        move_time: float = arc_length / speed_tangential  # Seconds.
+        segment_time = move_time / n_segments  # Seconds.
+
+        mot_vecs = np.zeros((n_segments, config.N_REV_JNT))
+        for idx in range(n_segments):
+            t = (1+idx) / n_segments  # Interpolation parameter in range [0, 1]
+            interp_pose: Pose = current_pose.arc_interpolate(target_pose, center, normal, total_angle, t)
+            ik_sol: IkSolution = self._manipulator.kinematics.inverse(interp_pose, prev_jnt_vec=current_jnt_vec)
+            if not ik_sol.success:
+                print(f"move_ops_lin: IK fail {ik_sol.joint_limits} {ik_sol.singularity}")
+                return False
+            interp_jnt_vec = ik_sol.joint_solution
+            current_jnt_vec = interp_jnt_vec.copy()
+
+            # Propagate motion command forwards
+            mot_vec = self._manipulator.request_joint_move(interp_jnt_vec)
+            if mot_vec is None:
+                return False
+
+            mot_vecs[idx] = mot_vec
+
+        for vec in mot_vecs:
+            self._sys_queue_move(mot_vec_manipulator=vec, time=segment_time)
+
+        return True
+
+    def translate_tool_6d(self, direction_vec: tuple[int, int, int], distance: float, speed: float, frame: str) -> bool:
         """ Creates a pure translation along any axis in any frame.
         :param direction_vec: Translation axis, any length
         :param distance: Translation distance, meters
@@ -317,11 +320,11 @@ class RobotSystem(QObject):
         mot_vecs, segment_time = ret
         # Send G-code to serial
         for vec in mot_vecs:
-            self.sys_queue_move(mot_vec_manipulator=vec, time=segment_time)
+            self._sys_queue_move(mot_vec_manipulator=vec, time=segment_time)
 
         return True
 
-    def rotate_tool(self, direction_vec: tuple[int, int, int], angle: float, speed: float, frame: str) -> bool:
+    def rotate_tool_6d(self, direction_vec: tuple[int, int, int], angle: float, speed: float, frame: str) -> bool:
         """ Creates a pure rotation around any axis in any frame.
         :param direction_vec: Rotation axis, any length
         :param angle: Rotation angle, radians
@@ -337,22 +340,40 @@ class RobotSystem(QObject):
         mot_vecs, segment_time = ret
         # Send G-code to serial
         for vec in mot_vecs:
-            self.sys_queue_move(mot_vec_manipulator=vec, time=segment_time)
+            self._sys_queue_move(mot_vec_manipulator=vec, time=segment_time)
 
         return True
 
+    # =============================================================================================
+    # =========================================== Slots ===========================================
+    # =============================================================================================
+    @pyqtSlot()
     def execute_planned(self):
         """ Execute state found in planned state.
         """
         mot_vec: np.ndarray = self.state.planned.motor_state
-        self.sys_motor_move_8d(mot_vec, time=10)
+        self.move_motor_8d(mot_vec, time=10)
 
+    @pyqtSlot()
     def revert_planned(self):
         self.state.planned.motor_state_ctrl_units = self.state.mcu.motor_state_ctrl_units
 
+    @pyqtSlot()
     def reset(self):
         self._manipulator.reset()
 
+    @pyqtSlot()
+    def plan_8d(self) -> None:
+        pose_world: Pose = self._manipulator.state.planner.link_nodes["PenHolder"].pose  # World frame
+
+        mot_vec: np.ndarray = self._request_cartesian_8d(pose_world)
+        if mot_vec is None:
+            self.send_terminal.emit(f"Failed to compute joint solution for planned pose.")
+            return
+
+        self.state.planned.motor_state = mot_vec
+
+    @pyqtSlot()
     def toggle_feed_hold(self):
         if self.state.controller == ControllerState.HOLD:
             self.g_code_generated.emit(self._gc_writer.cycle_start())
@@ -361,6 +382,7 @@ class RobotSystem(QObject):
         elif self.state.controller == ControllerState.CYCLE:
             self.g_code_generated.emit(self._gc_writer.feed_hold())
 
+    @pyqtSlot()
     def update_status(self, status: str, mot_list: list, delta_t: float):
         """ Update system status and return by dictionary.
         @param status: str, controller status.

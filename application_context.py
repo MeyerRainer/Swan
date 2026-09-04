@@ -19,7 +19,7 @@ class ApplicationContext:
         self.settings = ApplicationSettings()
         self.serial = GCSerial()
         self.robot_sys = RobotSystem()
-        self.vision_sys = VisionSystem()
+        self.vision_sys = VisionSystem(self.robot_sys)
         self.scene = SceneGraph(robot_sys=self.robot_sys, root=None, dir_path="scene/")
         self.planner = TrajectoryPlanner()
         self.program_manager = ProgramManager(planner=self.planner)

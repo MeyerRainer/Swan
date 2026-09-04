@@ -4,12 +4,15 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 import types
 
+from robot_math import utils
+from tic_tac_toe import robot_draw
 from PyQt6.QtCore import pyqtSlot, pyqtSignal, QObject, QThread, Qt
 import time
 from typing import Optional
 import threading
 import numpy as np
 
+from robot_manipulator.robot_system import RobotSystem
 from robot_math.pose import Pose
 from tic_tac_toe.ttt_board import TTTBoard, MachineMoveRequest
 from tic_tac_toe.ttt_detector import DetectorOutput, TTTDetector
@@ -32,9 +35,12 @@ class VisionSystem(QObject):
     sgn_error = pyqtSignal(str)
     sgn_message = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, robot_sys: RobotSystem):
 
         super().__init__()
+
+        # Robot sys
+        self.robot_sys: RobotSystem = robot_sys
 
         # Camera subsystem
         self._camera_driver = CameraDriver()
@@ -169,13 +175,17 @@ class VisionSystem(QObject):
                 if camera2board is not None and game_state_detection is not None and self._camera_driver.camera.calibration.extrinsic is not None:
                     self.ttt_board.pose = self._camera_driver.camera.calibration.extrinsic.compose(camera2board.marker_pose)  # World2board.
 
-                    machine_move_request = self.ttt_board.update(
+                    machine_move_request: MachineMoveRequest = self.ttt_board.update(
                         camera_calibration=self._camera_driver.camera.calibration,
                         ttt_detection=game_state_detection,
                         board_pose_estimation = camera2board
                     )
-                    # if machine_move_request is not None:
-                    #     self.sgn_machine_move_request.emit(machine_move_request)
+                    if machine_move_request is not None:
+                        # self.sgn_machine_move_request.emit(machine_move_request)
+                        robot_draw.machine_draw_o(robot_sys=self.robot_sys, char_pose=machine_move_request.mark_world_pose, speed=utils.mm_min2m_s(2000))
+                        # robot_draw.machine_draw_x(robot_sys=self.robot_sys, char_pose=machine_move_request.mark_world_pose, speed=utils.mm_min2m_s(2000))
+
+
 
                 self.sgn_processed_frame.emit(annotated)
 
@@ -183,12 +193,9 @@ class VisionSystem(QObject):
                 tr = exc.__traceback__
                 # self.sgn_error.emit(f"Vision processing error: {exc.with_traceback(exc.__traceback__)}")
                 raise RuntimeError().with_traceback(tr)
-                # TODO: Implement
-                self.sgn_processed_frame.emit(frame)
 
             finally:
-                time.sleep(0.5)  # Limit speed to 5Hz
-
+                time.sleep(0.5)  # Limit speed to 2Hz
     def command_robot_sys(self):
         ...
 

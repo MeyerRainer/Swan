@@ -96,7 +96,7 @@ L2_LENGTH = np.float64(0.160)
 
 PARALLEL_LINK_DIST = np.float64(0.090)
 
-CHAR_LEN = np.float64(0.2)  # Characteristic length, m
+LINK_CHARACTERISTIC_LENGTH = np.float64(0.2)  # Characteristic length, m
 
 # Sled total length (X-axis): 150mm
 # Sled rail center-to-center width (Y-axis): 118mm
@@ -112,7 +112,7 @@ BASE_OFFSET = np.array([0.440, 0.380, 0.0], dtype=np.float64)  # Offset from wor
 #     [0., 0., 0., 1.000]], dtype=np.float64)
 # Pen holder
 TOOL_OFS = np.array([
-    [0., 0., 1., -0.1158],
+    [0., 0., 1., -0.1498],
     [0., -1., 0., 0.0345],
     [1., 0., 0., 0.0195],
     [0., 0., 0., 1.0000]], dtype=np.float64)

@@ -110,7 +110,7 @@ class Quaternion:
         return cls(w, x, y, z)
 
     @classmethod
-    def from_rotation_matrix(cls, R: np.ndarray):
+    def from_rot_mat(cls, R: np.ndarray):
         """ Convert a 3x3 rotation matrix to a unit quaternion
         :param R: (np.ndarray): 3x3 rotation matrix
         :return: Quaternion
@@ -144,14 +144,14 @@ class Quaternion:
 
         return cls(w, x, y, z).normalized()
 
-    def to_rotation_matrix(self):
+    def to_rot_mat(self):
         """ Conversion from quaternion to rotation matrix """
         w, x, y, z = self._w, self._x, self._y, self._z
         return np.array([
             [2 * (w * w + x * x) - 1, 2 * (x * y - w * z), 2 * (x * z + w * y)],
             [2 * (x * y + w * z), 2 * (w * w + y * y) - 1, 2 * (y * z - w * x)],
             [2 * (x * z - w * y), 2 * (y * z + w * x), 2 * (w * w + z * z) - 1]
-        ])
+        ], dtype=np.float64)
 
     # --- Fundamental Mathematical Properties ---
     def norm_sq(self) -> float:
@@ -172,6 +172,11 @@ class Quaternion:
         if n == 0:
             raise ZeroDivisionError("Cannot normalize a zero-length quaternion.")
         return self / n
+
+    def relative_to(self, other: Quaternion) -> Quaternion:
+        if not isinstance(other, Quaternion):
+            raise TypeError(f"Expected type Quaternion, got {type(other)} instead.")
+        return other.inverse() * self
 
     def inverse(self) -> Quaternion:
         """ Returns the multiplicative inverse q^-1 = q* / |q|^2. """
@@ -212,9 +217,9 @@ class Quaternion:
         return self.__mul__(other)
 
     def __truediv__(self, scalar: float) -> Quaternion:
-        if isinstance(scalar, (int, float)):
-            return Quaternion(self._w / scalar, self._x / scalar, self._y / scalar, self._z / scalar)
-        return NotImplemented
+        if not isinstance(scalar, (int, float)):
+            raise TypeError(f"Expected type int or float, got {type(scalar)} instead.")
+        return Quaternion(self._w / scalar, self._x / scalar, self._y / scalar, self._z / scalar)
 
     def __neg__(self) -> Quaternion:
         return Quaternion(-self._w, -self._x, -self._y, -self._z)
@@ -308,7 +313,7 @@ class Quaternion:
     # --- Representation & Equality ---
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Quaternion):
-            return False
+            raise TypeError(f"Expected type Quaternion, got {type(other)} instead.")
         return math.isclose(self._w, other._w) and \
             math.isclose(self._x, other._x) and \
             math.isclose(self._y, other._y) and \
