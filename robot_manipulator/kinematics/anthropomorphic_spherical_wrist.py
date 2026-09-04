@@ -270,6 +270,7 @@ class ASWKinematics:
         wrist_solutions.sort(key=lambda x: np.linalg.norm(x-prev_jnt_vec[3:6]))
         theta4, theta5, theta6 = 0., 0., 0.
         limit_trigger: JointLimit = JointLimit.CLEAR
+        sol = 2
         for sol in wrist_solutions:
             theta4 = sol[0]
             if not JOINT_LIMITS['J4_MIN'] <= np.rad2deg(theta4) <= JOINT_LIMITS['J4_MAX']:
@@ -284,11 +285,15 @@ class ASWKinematics:
                 limit_trigger = JointLimit.J6_LIMIT
                 continue
             if limit_trigger is JointLimit.CLEAR:
+                sol = 1
                 break
 
         # print(f"IK solution: {np.rad2deg(np.array((theta1, theta2, theta3, theta4, theta5, theta6)))} degrees.")
         if limit_trigger != JointLimit.CLEAR:
             return IkSolution(joint_limits=limit_trigger)
+        dist1 = np.linalg.norm(wrist_sol_1 - prev_jnt_vec[3:6])
+        dist2 = np.linalg.norm(wrist_sol_2 - prev_jnt_vec[3:6])
+        print(f"IK: Sol 1 dist: {dist1}\tsol 2 dist: {dist2}. Picked solution {str(sol)}")
 
         return IkSolution(joint_solution=np.array([theta1, theta2, theta3, theta4, theta5, theta6]), success=True)
 

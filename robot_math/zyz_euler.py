@@ -82,19 +82,19 @@ class ZYZEuler:
         z1, y1, z2 = self.zyz[0], self.zyz[1], self.zyz[2]
 
         rot_alpha = np.array([
-            [math.cos(z1), -math.sin(z1), 0.],
-            [math.sin(z1), math.cos(z1), 0.],
-            [0., 0., 1.]])
+            [np.cos(z1), -np.sin(z1), 0.],
+            [np.sin(z1), np.cos(z1), 0.],
+            [0., 0., 1.]], dtype=np.float64)
 
         rot_nu = np.array([
-            [math.cos(y1), 0, math.sin(y1)],
+            [np.cos(y1), 0, np.sin(y1)],
             [0, 1, 0],
-            [-math.sin(y1), 0, math.cos(y1)]])
+            [-np.sin(y1), 0, np.cos(y1)]], dtype=np.float64)
 
         rot_psi = np.array([
-            [math.cos(z2), -math.sin(z2), 0],
-            [math.sin(z2), math.cos(z2), 0],
-            [0, 0, 1]])
+            [np.cos(z2), -np.sin(z2), 0],
+            [np.sin(z2), np.cos(z2), 0],
+            [0, 0, 1]], dtype=np.float64)
 
         return rot_alpha @ rot_nu @ rot_psi
 

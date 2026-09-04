@@ -4,7 +4,11 @@ Author: Rainer Meyer, r.meyer494@gmail.com
 """
 from robot_math.quaternion import Quaternion
 from robot_manipulator.manipulator_state import ManipulatorState
+from enum import Enum, auto
+from dataclasses import dataclass
 from robot_manipulator.kinematics.anthropomorphic_spherical_wrist import *
+import config
+from robot_math.pose import Pose
 from typing import Tuple, Optional
 import numpy as np
 
@@ -45,23 +49,23 @@ class MotorSolution(Enum):
 #     OK = auto()
 
 
-@dataclass
-class MotionQueryResponse:
-    """ Manipulators response to a motion query. Fail if::
-    -Inverse kinematics fail (point out of reach)
-    -Joint value out of range
-    -Motor value out of range
-    On success:
-    -
-
-    """
-    motion_accepted: bool
-    ik_solution: IkSolution         #
-    joint_solution: JointSolution   # Which joint out of range
-    motor_solution: MotorSolution   # Which motor out of range
-    motor_vector: np.ndarray        # New values for motors
-    # joint_vector: np.ndarray
-    # tool_pose: Pose
+# @dataclass
+# class MotionQueryResponse:
+#     """ Manipulators response to a motion query. Fail if::
+#     -Inverse kinematics fail (point out of reach)
+#     -Joint value out of range
+#     -Motor value out of range
+#     On success:
+#     -
+#
+#     """
+#     motion_accepted: bool
+#     ik_solution: IkSolution         #
+#     joint_solution: JointSolution   # Which joint out of range
+#     motor_solution: MotorSolution   # Which motor out of range
+#     motor_vector: np.ndarray        # New values for motors
+#     # joint_vector: np.ndarray
+#     # tool_pose: Pose
 
 
 class Manipulator:
@@ -83,8 +87,8 @@ class Manipulator:
 
         # Check limits
         mot_vec_deg = np.rad2deg(mot_vec)
-        for idx in range(N_REV_JNT):
-            if not MOTOR_LIMITS[f"M{idx+1}_MIN"] <= mot_vec_deg[idx] <= MOTOR_LIMITS[f"M{idx+1}_MAX"]:
+        for idx in range(config.N_REV_JNT):
+            if not config.MOTOR_LIMITS[f"M{idx+1}_MIN"] <= mot_vec_deg[idx] <= config.MOTOR_LIMITS[f"M{idx+1}_MAX"]:
                 print(f"Revolute motor {idx+1} out of range with value of {mot_vec_deg[idx]} degrees.")
                 return None
 
@@ -99,8 +103,8 @@ class Manipulator:
 
         # Check limits
         angle_deg = np.rad2deg(jnt_vec_abs)  # deg
-        for idx in range(N_REV_JNT):
-            if not JOINT_LIMITS[f"J{idx+1}_MIN"] <= angle_deg[idx] <= JOINT_LIMITS[f"J{idx+1}_MAX"]:
+        for idx in range(config.N_REV_JNT):
+            if not config.JOINT_LIMITS[f"J{idx+1}_MIN"] <= angle_deg[idx] <= config.JOINT_LIMITS[f"J{idx+1}_MAX"]:
                 print(f"Revolute joint out of range")
                 return None
 
@@ -111,9 +115,9 @@ class Manipulator:
 
     def reset(self):
         """ Reset internal state """
-        self.state.mcu.motor_state = np.zeros(N_REV_JNT, dtype=np.float64)
-        self.state.queued.motor_state = np.zeros(N_REV_JNT, dtype=np.float64)
-        self.state.planner.motor_state = np.zeros(N_REV_JNT, dtype=np.float64)
+        self.state.mcu.motor_state = np.zeros(config.N_REV_JNT, dtype=np.float64)
+        self.state.queued.motor_state = np.zeros(config.N_REV_JNT, dtype=np.float64)
+        self.state.planner.motor_state = np.zeros(config.N_REV_JNT, dtype=np.float64)
 
     def move_motors(self, mcu: Optional[np.ndarray] = None, queued: Optional[np.ndarray] = None, planned: Optional[np.ndarray] = None) -> None:
         """ Update internal manipulator state with a pre-verified motor vector.
@@ -206,7 +210,7 @@ class Manipulator:
         segment_time = move_time / n_segments  # Seconds
 
         current_jnt_vec = self.state.queued.joint_state
-        mot_vecs = np.zeros((n_segments, N_REV_JNT))
+        mot_vecs = np.zeros((n_segments, config.N_REV_JNT))
         for idx in range(n_segments):
             t = (1+idx) / n_segments  # Interpolation parameter in range [0, 1]
             interp_pose = current_pose.interpolate(target_pose, t)
@@ -226,66 +230,6 @@ class Manipulator:
 
         # All interpolation points computed successfully
         return mot_vecs, segment_time
-
-    # def request_cartesian_circle_move(self, target_pose: Pose, center: Pose, speed_tangential: float = None, segment_length_m: float = 0.001) -> Optional[Tuple[np.ndarray, float]]:
-    #     """ Linear move in operational space  coordinates.
-    #     :param target_pose: Target 6D-Pose in manipulator frame
-    #     :param center:
-    #     :param speed_tangential: m/s, arc tangent speed.
-    #     :param segment_length_m: m, Length of translational segment.
-    #     :return: True if move was executed
-    #     """
-    #     current_pose: Pose = self.state.queued.ops_state
-    #
-    #     eps: float = 1e-4  # Tolerance.
-    #
-    #     # Circle too small.
-    #     radius: float = current_pose.distance(center)
-    #     if radius < eps:
-    #         return None
-    #
-    #     if abs(center.distance(current_pose) - center.distance(target_pose)) < eps:
-    #         return None
-    #
-    #     # Full circle
-    #     if current_pose.is_close(target_pose):
-    #         # Define plane somehow
-    #         ...
-    #
-    #     # Translational error, meters
-    #     circumference_length: float =
-    #     n_segments = int(np.ceil(tool_translation_dist / segment_length_m))
-    #
-    #
-    #     # Choose whether rotation or translation determines segment count
-    #
-    #     # Compute movement time (seconds)
-    #     if speed_tangential is not None:
-    #         raise ValueError("Linear movement needs speed specified.")
-    #
-    #     segment_time = move_time / n_segments  # Seconds
-    #
-    #     current_jnt_vec = self.state.queued.joint_state
-    #     mot_vecs = np.zeros((n_segments, N_REV_JNT))
-    #     for idx in range(n_segments):
-    #         t = (1+idx) / n_segments  # Interpolation parameter in range [0, 1]
-    #         interp_pose = current_pose.interpolate(target_pose, t)
-    #         ik_sol: IkSolution = self.kinematics.inverse(interp_pose, prev_jnt_vec=current_jnt_vec)
-    #         if not ik_sol.success:
-    #             print(f"move_ops_lin: IK fail.")
-    #             return None
-    #         interp_jnt_vec = ik_sol.joint_solution
-    #         current_jnt_vec = interp_jnt_vec.copy()
-    #
-    #         # Propagate motion command forwards
-    #         mot_vec = self._ensure_joint_move(interp_jnt_vec)
-    #         if mot_vec is None:
-    #             return None
-    #
-    #         mot_vecs[idx] = mot_vec
-    #
-    #     # All interpolation points computed successfully
-    #     return mot_vecs, segment_time
 
     def translate_tool(self, direction_vec: tuple[int, int, int], distance: float, speed: float, frame: str) -> Tuple[np.ndarray, float] | None:
         """ Creates a pure translation along any axis in any frame.
